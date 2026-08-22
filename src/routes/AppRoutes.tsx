@@ -11,6 +11,7 @@ import Login from '../pages/Login';
 import Procesar from '../pages/dashboard/Procesar';
 import Reportes from '../pages/dashboard/Reportes';
 import LimpiarDatos from '../pages/dashboard/LimpiarDatos';
+import Inicio from '../pages/dashboard/Inicio';
 
 function AppRoutes() {
     return (
@@ -27,8 +28,10 @@ function AppRoutes() {
             {/* Rutas con Sidebar privado */}
             <Route path="/dashboard" element={<DashboardLayout />}>
                 <Route index element={<Navigate to="procesar" replace />} />
+                <Route path="inicio" element={<Inicio />} />
                 <Route path="procesar" element={<Procesar />} />
                 <Route path="limpiar" element={<LimpiarDatos />} />
+                <Route path="limpiardatos" element={<LimpiarDatos />} />
                 <Route path="reportes" element={<Reportes />} />
             </Route>
         </Routes>

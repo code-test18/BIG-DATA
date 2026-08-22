@@ -7,11 +7,14 @@ function Sidebar() {
         <h3>BigData Admin</h3>
       </div>
       <nav className="sidebar-nav">
+        <NavLink to="/dashboard/Inicio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          Inicio
+        </NavLink>
+        <NavLink to="/dashboard/limpiardatos" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          Carga y Limpieza
+        </NavLink>
         <NavLink to="/dashboard/procesar" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           Procesar
-        </NavLink>
-        <NavLink to="/dashboard/limpiar" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          Limpiar datos
         </NavLink>
         <NavLink to="/dashboard/reportes" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           Reportes
