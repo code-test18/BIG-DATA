@@ -7,7 +7,7 @@ export type AnalysisSelection = Partial<Record<FieldRole, string>>;
 export interface AnalysisRequest {
   target: AnalysisTarget;
   columns: AnalysisSelection;
-  grouping?: Grouping;
+  grouping?: string;
 }
 
 export interface AnalysisSeriesItem {
