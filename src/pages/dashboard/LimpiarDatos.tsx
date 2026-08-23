@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useCsvCleaning } from '../../hooks/useCsvCleaning';
 import { inspectCsvRows } from '../../services/csvCleaningService';
 import type { DashboardContextType } from '../../types/csv';
+import CsvCharts from '../../components/CsvCharts';
 
 function LimpiarDatos() {
   const { files, activeFileId, setActiveFileId, addFile, updateFile } = useOutletContext<DashboardContextType>();
@@ -52,6 +53,11 @@ function LimpiarDatos() {
             <div className="card"><h3>Filas duplicadas</h3><p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{qualitySummary?.removedDuplicates ?? 0}</p></div>
           </div>
           <div className="card cleaning-actions"><h3>{activeFile.isClean ? 'CSV limpio' : 'Aplicar limpieza'}</h3><p>{activeFile.isClean ? 'Este archivo ya fue limpiado y está disponible para análisis.' : 'El diagnóstico no ha modificado el archivo. Escribe el valor para reemplazar los campos vacíos y confirma la limpieza.'}</p>{!activeFile.isClean && <div className="clean-action-row"><input className="form-input" value={fillValue} onChange={(event) => setFillValue(event.target.value)} placeholder="Valor de reemplazo" /><button className="btn btn-primary" onClick={handleClean}>Limpiar y guardar CSV</button></div>}</div>
+          <CsvCharts
+            headers={activeFile.headers}
+            rows={activeFile.rows}
+            summary={qualitySummary!}
+          />
           <div className="table-wrapper"><div className="table-header-info"><h3>Vista previa: {activeFile.name}</h3><small>{activeFile.rows.length} filas · {activeFile.isClean ? 'limpias' : 'sin modificar'}</small></div><div className="table-scroll"><table className="data-table"><thead><tr>{activeFile.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{activeFile.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell || <span className="empty-cell">(vacío)</span>}</td>)}</tr>)}</tbody></table></div></div>
         </>}
       </> : <div className="empty-state"><p>No hay archivos cargados. Sube un CSV para comenzar.</p></div>}
