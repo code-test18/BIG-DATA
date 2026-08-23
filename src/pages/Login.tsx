@@ -1,32 +1,46 @@
 import { useState, useRef, type SyntheticEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const emptyOtp = () => Array(6).fill('');
+
 function Login() {
   const [email, setEmail] = useState<string>('');
-  const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
-  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
+  const [otp, setOtp] = useState<string[]>(emptyOtp);
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
 
-  // 1. Envío de correo
-  const handleSendOtp = (e: SyntheticEvent<HTMLFormElement>) => {
+  // 1. Solicitud de envío del código al servidor
+  const handleSendOtp = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
-    if (!email.trim() || !email.includes('@')) {
-      setError('Por favor, ingresa un correo electrónico válido.');
-      return;
+    try {
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = (await response.json()) as { challenge?: string; error?: string };
+
+      if (!response.ok || !data.challenge) {
+        throw new Error(data.error ?? 'No fue posible enviar el código.');
+      }
+
+      setChallenge(data.challenge);
+      setOtp(emptyOtp());
+      setStep('otp');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No fue posible enviar el código.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const fakeCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(fakeCode);
-    setStep('otp');
-
-    console.log(`%c[SIMULACIÓN OTP] Código enviado a ${email}: ${fakeCode}`, 'color: #00ff00; font-weight: bold; font-size: 14px;');
   };
 
   // 2. Control de cada casilla de texto
@@ -61,16 +75,28 @@ function Login() {
   };
 
   // 5. Validación del código OTP
-  const handleVerifyOtp = (e: SyntheticEvent<HTMLFormElement>) => {
+  const handleVerifyOtp = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
-    const enteredOtp = otp.join('');
-    if (enteredOtp === generatedOtp) {
-      alert('¡Inicio de sesión exitoso!');
+    try {
+      const response = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challenge, otp: otp.join('') }),
+      });
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? 'El código ingresado es incorrecto.');
+      }
+
       navigate('/dashboard/procesar');
-    } else {
-      setError('El código ingresado es incorrecto. Revisa la consola (F12).');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No fue posible verificar el código.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -103,7 +129,7 @@ function Login() {
               />
             </div>
             <button type="submit" className="btn btn-primary">
-              Enviar código de verificación
+              {isLoading ? 'Enviando...' : 'Enviar código de verificación'}
             </button>
           </form>
         ) : (
@@ -128,7 +154,7 @@ function Login() {
             </div>
 
             <button type="submit" className="btn btn-primary">
-              Verificar Código
+              {isLoading ? 'Verificando...' : 'Verificar Código'}
             </button>
 
             <button
@@ -136,7 +162,8 @@ function Login() {
               className="btn btn-secondary"
               onClick={() => {
                 setStep('email');
-                setOtp(Array(6).fill(''));
+                setOtp(emptyOtp());
+                setChallenge(null);
                 setError(null);
               }}
             >

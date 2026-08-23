@@ -1,5 +1,15 @@
 # React + TypeScript + Vite
 
+## OTP con Resend
+
+El login usa las funciones serverless de `api/` para generar y verificar el OTP. Configura estas variables en el entorno del proveedor (y localmente en `.env`):
+
+- `RESEND_API_KEY`: API key de Resend.
+- `RESEND_FROM_EMAIL`: remitente de un dominio verificado en Resend.
+- `OTP_SESSION_SECRET`: secreto largo y aleatorio para firmar los desafíos.
+
+En despliegues Vercel, las funciones se publican automáticamente desde `api/`. Para desarrollo local con esas rutas, ejecuta `vercel dev`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
