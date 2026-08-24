@@ -1,18 +1,38 @@
-import { useState, useRef, type SyntheticEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect, type SyntheticEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+
+const OTP_LENGTH = 6;
+const RESEND_COOLDOWN = 30; 
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 function Login() {
-  const [email, setEmail] = useState<string>('');
-  const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
-
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
 
-  // 1. Envío de correo
+  // Cuenta regresiva para el reenvío de código
+  useEffect(() => {
+    if (cooldown === 0) return;
+    const timer = setInterval(() => setCooldown((prev) => prev - 1), 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const sendOtp = () => {
+    const fakeCode = generateOtp();
+    setGeneratedOtp(fakeCode);
+    setCooldown(RESEND_COOLDOWN);
+    console.log(`%c[SIMULACIÓN OTP] Código enviado a ${email}: ${fakeCode}`, 'color: #00ff00; font-weight: bold; font-size: 14px;');
+  };
+
   const handleSendOtp = (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -22,56 +42,62 @@ function Login() {
       return;
     }
 
-    const fakeCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(fakeCode);
+    sendOtp();
     setStep('otp');
-
-    console.log(`%c[SIMULACIÓN OTP] Código enviado a ${email}: ${fakeCode}`, 'color: #00ff00; font-weight: bold; font-size: 14px;');
   };
 
-  // 2. Control de cada casilla de texto
+  const handleResendOtp = () => {
+    if (cooldown > 0) return;
+    setOtp(Array(OTP_LENGTH).fill(''));
+    setError(null);
+    sendOtp();
+    inputRefs.current[0]?.focus();
+  };
+
   const handleOtpChange = (value: string, index: number) => {
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
-    newOtp[index] = value.substring(value.length - 1);
+    newOtp[index] = value.slice(-1);
     setOtp(newOtp);
 
-    if (value && index < 5) {
+    if (value && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
-  // 3. Control de borrado (Backspace)
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  // 4. Control de pegado
   const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').trim();
 
-    if (/^\d{6}$/.test(pastedData)) {
+    if (new RegExp(`^\\d{${OTP_LENGTH}}$`).test(pastedData)) {
       setOtp(pastedData.split(''));
-      inputRefs.current[5]?.focus();
+      inputRefs.current[OTP_LENGTH - 1]?.focus();
     }
   };
 
-  // 5. Validación del código OTP
   const handleVerifyOtp = (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
-    const enteredOtp = otp.join('');
-    if (enteredOtp === generatedOtp) {
-      alert('¡Inicio de sesión exitoso!');
+    if (otp.join('') === generatedOtp) {
       navigate('/dashboard/procesar');
     } else {
       setError('El código ingresado es incorrecto. Revisa la consola (F12).');
     }
+  };
+
+  const handleChangeEmail = () => {
+    setStep('email');
+    setOtp(Array(OTP_LENGTH).fill(''));
+    setError(null);
+    setCooldown(0);
   };
 
   return (
@@ -116,6 +142,7 @@ function Login() {
                     inputRefs.current[index] = el;
                   }}
                   type="text"
+                  inputMode="numeric"
                   maxLength={1}
                   className="otp-box"
                   value={digit}
@@ -127,23 +154,28 @@ function Login() {
               ))}
             </div>
 
+            <button
+              type="button"
+              className="btn-link"
+              onClick={handleResendOtp}
+              disabled={cooldown > 0}
+            >
+              {cooldown > 0 ? `Reenviar código (${cooldown}s)` : 'Reenviar código'}
+            </button>
+
             <button type="submit" className="btn btn-primary">
               Verificar Código
             </button>
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setStep('email');
-                setOtp(Array(6).fill(''));
-                setError(null);
-              }}
-            >
+            <button type="button" className="btn btn-secondary" onClick={handleChangeEmail}>
               Cambiar correo
             </button>
           </form>
         )}
+
+        <p className="auth-footer">
+          ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
+        </p>
       </div>
     </section>
   );
