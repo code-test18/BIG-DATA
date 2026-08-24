@@ -1,5 +1,6 @@
 import { useState, type SyntheticEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { authService } from '../../services/authService';
 
 interface FormData {
   nombre: string;
@@ -18,13 +19,14 @@ const initialForm: FormData = {
 function Registro() {
   const [form, setForm] = useState<FormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (field: keyof FormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
@@ -48,9 +50,21 @@ function Registro() {
       return;
     }
 
-    // Aquí iría la llamada real al backend para crear la cuenta
-    console.log('%c[SIMULACIÓN REGISTRO] Cuenta creada:', 'color: #00ff00; font-weight: bold;', form);
-    navigate('/login');
+    setLoading(true);
+    try {
+      const result = await authService.register({
+        name: form.nombre.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
+      const userId = result?.userId ?? result?.user?.id ?? result?.id;
+      if (!userId) throw new Error('No se recibió el identificador del usuario.');
+      navigate('/otp', { state: { userId } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta. Intenta nuevamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -122,8 +136,8 @@ function Registro() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary">
-            Crear cuenta
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
         </form>
 
