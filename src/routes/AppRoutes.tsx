@@ -6,7 +6,8 @@ import Home from '../pages/Home';
 import About from '../pages/About';
 import Services from '../pages/Services';
 import Contact from '../pages/Contact';
-import Login from '../pages/Login';
+import Login from '../pages/login/Login';
+import Registro from '../pages/login/Registro';
 
 import Procesar from '../pages/dashboard/Procesar';
 import Reportes from '../pages/dashboard/Reportes';
@@ -23,6 +24,7 @@ function AppRoutes() {
                 <Route path="/servicios" element={<Services />} />
                 <Route path="/contacto" element={<Contact />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/registro" element={<Registro />} />
             </Route>
 
             {/* Rutas con Sidebar privado */}
