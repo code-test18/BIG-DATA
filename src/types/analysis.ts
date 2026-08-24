@@ -20,8 +20,7 @@ export interface AnalysisRequest {
 
   columns: AnalysisSelection;
 
-  grouping?: Grouping;
-
+  grouping?: string;
 }
 
 export interface AnalysisSeriesItem {
