@@ -1,172 +1,148 @@
-import { useState, type ChangeEvent } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import Papa from 'papaparse';
-import type { DashboardContextType, CsvFile } from '../../types/csv';
+import { useState } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useAnalysis } from '../../hooks/useAnalysis';
+import type { AnalysisRequest, AnalysisSelection } from '../../types/analysis';
+import type { DashboardContextType } from '../../types/csv';
 
 function Procesar() {
-  const { files, activeFileId, addFile, setActiveFileId } = useOutletContext<DashboardContextType>();
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const { files, activeFileId, setActiveFileId, setAnalysisResult } = useOutletContext<DashboardContextType>();
+  const navigate = useNavigate();
+  const [selection, setSelection] = useState<AnalysisSelection>({});
+  const [hasProcessed, setHasProcessed] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const { runAnalysis, status, error, clearError } = useAnalysis();
 
-  const activeFile = files.find((f) => f.id === activeFileId);
+  const cleanFiles = files.filter((file) => file.isClean);
+  const activeFile = cleanFiles.find((file) => file.id === activeFileId) ?? cleanFiles[0];
 
-  // Lógica de carga utilizando PapaParse
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse<string[]>(file, {
-      skipEmptyLines: true,
-      complete: (results) => {
-        const rawData = results.data;
-        if (rawData.length === 0) return;
-
-        // Extraer encabezados y filas
-        const headers = rawData[0].map((h) => h.trim());
-        const rows = rawData.slice(1).map((row) => row.map((cell) => cell.trim()));
-
-        const newCsvFile: CsvFile = {
-          id: crypto.randomUUID(),
-          name: file.name,
-          headers,
-          rows,
-          uploadedAt: new Date().toLocaleTimeString(),
-        };
-
-        addFile(newCsvFile);
-      },
-      error: (error) => {
-        console.error('Error al procesar el archivo CSV:', error);
-      },
-    });
-
-    e.target.value = ''; // Limpiar el input de archivos
+  const handleFileChange = (fileId: string) => {
+    setActiveFileId(fileId);
+    setSelection({});
+    setHasProcessed(false);
+    setSelectionError(null);
+    clearError();
   };
 
-  // Solo tomar las primeras 50 filas para la vista previa
-  const previewRows = activeFile ? activeFile.rows.slice(0, 50) : [];
-  const totalRows = activeFile ? activeFile.rows.length : 0;
+  const handleColumnChange = (role: 'category' | 'metric', value: string) => {
+    setSelection((current) => ({ ...current, [role]: value }));
+    setHasProcessed(false);
+    setSelectionError(null);
+    clearError();
+  };
+
+  const handleProcess = async () => {
+    if (!activeFile) return;
+    if (!selection.category || !selection.metric) {
+      setSelectionError('Selecciona una categoría y una métrica antes de iniciar el análisis.');
+      return;
+    }
+    const request: AnalysisRequest = { target: 'dynamic_mapping', columns: selection };
+    const result = await runAnalysis(activeFile, request);
+    if (result) {
+      setAnalysisResult(result);
+      setHasProcessed(true);
+
+      // GUARDA LA CONFIGURACIÓN Y EL CSV EN LOCALSTORAGE AL PROCESAR CON ÉXITO
+      localStorage.setItem(
+        'reporte_config',
+        JSON.stringify({ ejeX: selection.category, ejeY: selection.metric })
+      );
+      
+      // Si activeFile contiene las filas, guarda los datos para que Reportes.tsx los lea
+      if (activeFile.rows) {
+        localStorage.setItem('uploaded_csv_data', JSON.stringify(activeFile.rows));
+      }
+    }
+  };
 
   return (
     <div className="dashboard-page">
-      <h2>Procesar Archivos CSV</h2>
-      <p>Carga y visualiza tus conjuntos de datos masivos.</p>
-
-      {/* Carga de archivo */}
-      <div className="upload-box">
-        <label htmlFor="csv-input" className="btn btn-primary upload-btn">
-          📂 Subir archivo CSV
-        </label>
-        <input
-          id="csv-input"
-          type="file"
-          accept=".csv"
-          onChange={handleFileUpload}
-          style={{ display: 'none' }}
-        />
-      </div>
-
-      {/* Selector de archivos cargados */}
-      {files.length > 0 && (
-        <div className="file-selector">
-          <span>Archivos cargados:</span>
-          <div className="file-tabs">
-            {files.map((file) => (
-              <button
-                key={file.id}
-                className={`tab-btn ${file.id === activeFileId ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveFileId(file.id);
-                  setIsModalOpen(false);
-                }}
-              >
-                {file.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Vista Previa Limitada */}
-      {activeFile ? (
-        <div className="table-wrapper">
-          <div className="table-header-info">
-            <div>
-              <h3>{activeFile.name}</h3>
-              <small>
-                Mostrando {previewRows.length} de {totalRows} filas | {activeFile.headers.length} columnas
-              </small>
-            </div>
-
-            {totalRows > 50 && (
-              <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-                Ver completo ({totalRows} filas)
-              </button>
-            )}
-          </div>
-
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  {activeFile.headers.map((header, idx) => (
-                    <th key={idx}>{header}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {previewRows.map((row, rIdx) => (
-                  <tr key={rIdx}>
-                    {row.map((cell, cIdx) => (
-                      <td key={cIdx}>{cell || <span className="empty-cell">(vacío)</span>}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <h2>Procesar y analizar</h2>
+      <p>Selecciona un CSV limpio y relaciona una categoría con una métrica numérica.</p>
+      {cleanFiles.length === 0 ? (
+        <div className="empty-state">
+          <p>No hay CSV limpios disponibles. Primero carga y limpia un archivo.</p>
         </div>
       ) : (
-        <div className="empty-state">
-          <p>No hay datos cargados. Sube un archivo CSV para previsualizar su contenido.</p>
-        </div>
-      )}
-
-      {/* Modal para Visualización Completa */}
-      {isModalOpen && activeFile && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>Dataset Completo: {activeFile.name}</h3>
-                <small>{totalRows} filas registradas</small>
-              </div>
-              <button className="btn-close" onClick={() => setIsModalOpen(false)}>
-                ✕
-              </button>
-            </div>
-
-            <div className="table-scroll" style={{ maxHeight: '60vh' }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    {activeFile.headers.map((header, idx) => (
-                      <th key={idx}>{header}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeFile.rows.map((row, rIdx) => (
-                    <tr key={rIdx}>
-                      {row.map((cell, cIdx) => (
-                        <td key={cIdx}>{cell || <span className="empty-cell">(vacío)</span>}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <section className="analysis-panel">
+          <div className="step-heading">
+            <span>01</span>
+            <div>
+              <h3>Selecciona el CSV limpio</h3>
+              <p>Los encabezados se cargarán desde el archivo elegido.</p>
             </div>
           </div>
-        </div>
+          <select
+            className="form-input"
+            value={activeFile?.id ?? ''}
+            onChange={(event) => handleFileChange(event.target.value)}
+          >
+            {cleanFiles.map((file) => (
+              <option key={file.id} value={file.id}>
+                {file.name} · {file.rows.length} registros
+              </option>
+            ))}
+          </select>
+
+          <div className="step-heading">
+            <span>02</span>
+            <div>
+              <h3>Define el objetivo</h3>
+              <p>Usa cualquier columna categórica y cualquier columna numérica del CSV.</p>
+            </div>
+          </div>
+          {activeFile && (
+            <div className="analysis-fields">
+              <label className="form-group">
+                <span className="form-label">Agrupar por / Categoría</span>
+                <select
+                  className="form-input"
+                  value={selection.category ?? ''}
+                  onChange={(event) => handleColumnChange('category', event.target.value)}
+                >
+                  <option value="">Selecciona un header</option>
+                  {activeFile.headers.map((header) => (
+                    <option key={header} value={header}>
+                      {header}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="form-group">
+                <span className="form-label">Medir / Métrica</span>
+                <select
+                  className="form-input"
+                  value={selection.metric ?? ''}
+                  onChange={(event) => handleColumnChange('metric', event.target.value)}
+                >
+                  <option value="">Selecciona un header</option>
+                  {activeFile.headers.map((header) => (
+                    <option key={header} value={header}>
+                      {header}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          <div className="step-heading compact">
+            <span>03</span>
+            <div>
+              <h3>Ejecuta el análisis</h3>
+              <p>La métrica se sumará para cada valor de la categoría.</p>
+            </div>
+          </div>
+          {(error || selectionError) && <div className="alert-error">{error || selectionError}</div>}
+          <button className="btn btn-primary process-btn" onClick={handleProcess} disabled={status === 'loading'}>
+            {status === 'loading' ? 'Procesando...' : 'Iniciar Análisis'}
+          </button>
+          {status === 'success' && hasProcessed && (
+            <button className="btn btn-secondary report-cta" onClick={() => navigate('/dashboard/reportes')}>
+              Generar Reporte →
+            </button>
+          )}
+        </section>
       )}
     </div>
   );

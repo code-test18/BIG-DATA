@@ -6,6 +6,7 @@ import type { CsvFile, DashboardContextType } from '../types/csv';
 function DashboardLayout() {
   const [files, setFiles] = useState<CsvFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<DashboardContextType['analysisResult']>(null);
 
   const addFile = (newFile: CsvFile) => {
     setFiles((prev) => [...prev, newFile]);
@@ -22,6 +23,8 @@ function DashboardLayout() {
     addFile,
     updateFile,
     setActiveFileId,
+    analysisResult,
+    setAnalysisResult,
   };
 
   return (
