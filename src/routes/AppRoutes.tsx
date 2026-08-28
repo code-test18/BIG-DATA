@@ -19,6 +19,7 @@ const Inicio = lazy(() => import('../pages/dashboard/Inicio'));
 const Procesar = lazy(() => import('../pages/dashboard/Procesar'));
 const LimpiarDatos = lazy(() => import('../pages/dashboard/LimpiarDatos'));
 const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
+const Ventas = lazy(() => import('../pages/dashboard/Ventas')); // <--- 1. Reemplazado import directo por lazy
 
 function AppRoutes() {
   return (
@@ -43,6 +44,7 @@ function AppRoutes() {
           <Route path="limpiar" element={<LimpiarDatos />} />
           <Route path="limpiardatos" element={<LimpiarDatos />} />
           <Route path="reportes" element={<Reportes />} />
+          <Route path="ventas" element={<Ventas />} /> {/* <--- 2. Nueva ruta agregada */}
         </Route>
       </Routes>
     </Suspense>
