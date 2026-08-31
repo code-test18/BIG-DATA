@@ -25,6 +25,7 @@ export interface MetricasVentas {
   ticketPromedio: number;
   categoriaTop: string;
   numeroTransacciones: number;
+  unidadesTotales?: number;
 }
 
 // Un reporte de Ventas completo y ya calculado, listo para guardar y volver a mostrar
@@ -39,5 +40,6 @@ export interface VentaReporte {
   metricas: MetricasVentas;
   graficoPorCategoria: PuntoTotal[];
   graficoPorFecha: PuntoTotal[];
+  graficoUnidadesPorCategoria?: PuntoTotal[];
   participacionCategoria: PuntoParticipacion[];
 }

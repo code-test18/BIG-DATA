@@ -43,8 +43,13 @@ function Ventas() {
 
   const mapeoCompleto =
     selection.fecha && selection.categoria && selection.monto
-      ? { fecha: selection.fecha, categoria: selection.categoria, monto: selection.monto }
-      : null;
+    ? {
+        fecha: selection.fecha,
+        categoria: selection.categoria,
+        monto: selection.monto,
+        cantidad: selection.cantidad,
+      }
+    : null;
 
   const resultado =
     activeFile && mapeoCompleto ? calcularMetricasVentas(activeFile, mapeoCompleto) : null;
@@ -57,13 +62,11 @@ function Ventas() {
       tipo: 'ventas',
       nombreArchivo: activeFile.name,
       createdAt: new Date().toISOString(),
-      mapeo: {
-        ...mapeoCompleto,
-        cantidad: selection.cantidad,
-      },
+      mapeo: mapeoCompleto,
       metricas: resultado.metricas,
       graficoPorCategoria: resultado.graficoPorCategoria,
       graficoPorFecha: resultado.graficoPorFecha,
+      graficoUnidadesPorCategoria: resultado.graficoUnidadesPorCategoria,
       participacionCategoria: resultado.participacionCategoria,
     };
 
@@ -192,7 +195,7 @@ interface ResultadoVentasProps {
 }
 
 function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProps) {
-  const { metricas, graficoPorCategoria, graficoPorFecha, participacionCategoria } = resultado;
+  const { metricas, graficoPorCategoria, graficoPorFecha, participacionCategoria, graficoUnidadesPorCategoria } = resultado;
 
   return (
     <div className="resultado-ventas">
@@ -213,6 +216,12 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
           <span className="metric-label">Transacciones</span>
           <span className="metric-value">{metricas.numeroTransacciones}</span>
         </div>
+        {metricas.unidadesTotales !== undefined && (
+            <div className="metric-card">
+                <span className="metric-label">Unidades vendidas</span>
+                <span className="metric-value">{metricas.unidadesTotales}</span>
+            </div>
+        )}
       </div>
 
       <div className="chart-block">
@@ -263,6 +272,21 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
           </PieChart>
         </ResponsiveContainer>
       </div>
+
+      {graficoUnidadesPorCategoria && (
+        <div className="chart-block">
+            <h4>Unidades vendidas por categoría</h4>
+            <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={graficoUnidadesPorCategoria}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="total" fill="#10b981" />
+            </BarChart>
+            </ResponsiveContainer>
+        </div>
+      )}
 
       <button className="btn btn-secondary report-cta" onClick={onGuardar} disabled={guardado}>
         {guardado ? 'Reporte guardado ✓' : 'Guardar Reporte'}

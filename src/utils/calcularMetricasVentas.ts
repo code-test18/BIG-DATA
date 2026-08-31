@@ -11,28 +11,33 @@ export interface ResultadoCalculoVentas {
   graficoPorCategoria: PuntoTotal[];
   graficoPorFecha: PuntoTotal[];
   participacionCategoria: PuntoParticipacion[];
+  graficoUnidadesPorCategoria?: PuntoTotal[];
 }
 
 function calcularMetricasVentas(
   file: CsvFile,
-  mapeo: Required<Pick<VentasSelection, 'fecha' | 'categoria' | 'monto'>>
+  mapeo: Required<Pick<VentasSelection, 'fecha' | 'categoria' | 'monto'>> &
+    Pick<VentasSelection, 'cantidad'>
 ): ResultadoCalculoVentas {
   const idxFecha = file.headers.indexOf(mapeo.fecha);
   const idxCategoria = file.headers.indexOf(mapeo.categoria);
   const idxMonto = file.headers.indexOf(mapeo.monto);
+  const idxCantidad = mapeo.cantidad ? file.headers.indexOf(mapeo.cantidad) : -1;
 
   const totalesPorCategoria = new Map<string, number>();
   const totalesPorFecha = new Map<string, number>();
+  const unidadesPorCategoria = new Map<string, number>();
 
   let ingresoTotal = 0;
   let numeroTransacciones = 0;
+  let unidadesTotales = 0;
 
   for (const row of file.rows) {
     const montoTexto = row[idxMonto];
     const monto = Number(montoTexto);
 
     if (montoTexto === undefined || Number.isNaN(monto)) {
-      continue; // fila inválida para efectos numéricos, se ignora
+      continue;
     }
 
     const categoria = row[idxCategoria] ?? 'Sin categoría';
@@ -43,6 +48,14 @@ function calcularMetricasVentas(
 
     totalesPorCategoria.set(categoria, (totalesPorCategoria.get(categoria) ?? 0) + monto);
     totalesPorFecha.set(fecha, (totalesPorFecha.get(fecha) ?? 0) + monto);
+
+    if (idxCantidad !== -1) {
+      const cantidad = Number(row[idxCantidad]);
+      if (!Number.isNaN(cantidad)) {
+        unidadesTotales += cantidad;
+        unidadesPorCategoria.set(categoria, (unidadesPorCategoria.get(categoria) ?? 0) + cantidad);
+      }
+    }
   }
 
   const graficoPorCategoria: PuntoTotal[] = Array.from(totalesPorCategoria, ([label, total]) => ({
@@ -70,9 +83,21 @@ function calcularMetricasVentas(
     ticketPromedio: numeroTransacciones > 0 ? ingresoTotal / numeroTransacciones : 0,
     categoriaTop,
     numeroTransacciones,
+    ...(idxCantidad !== -1 ? { unidadesTotales } : {}),
   };
 
-  return { metricas, graficoPorCategoria, graficoPorFecha, participacionCategoria };
+  const graficoUnidadesPorCategoria: PuntoTotal[] | undefined =
+    idxCantidad !== -1
+      ? Array.from(unidadesPorCategoria, ([label, total]) => ({ label, total }))
+      : undefined;
+
+  return {
+    metricas,
+    graficoPorCategoria,
+    graficoPorFecha,
+    participacionCategoria,
+    graficoUnidadesPorCategoria,
+  };
 }
 
 export { calcularMetricasVentas };
