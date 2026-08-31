@@ -16,6 +16,9 @@ function Sidebar() {
         <NavLink to="/dashboard/procesar" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           Procesar
         </NavLink>
+        <NavLink to="/dashboard/ventas" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          Ventas
+        </NavLink>
         <NavLink to="/dashboard/reportes" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           Reportes
         </NavLink>
