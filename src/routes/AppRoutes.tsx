@@ -16,7 +16,7 @@ const Otp = lazy(() => import('../pages/login/Otp'));
 
 // Carga perezosa (Lazy Loading) del Dashboard
 const Inicio = lazy(() => import('../pages/dashboard/Inicio'));
-const Procesar = lazy(() => import('../pages/dashboard/Procesar'));
+const Procesar = lazy(() => import('../pages/dashboard/proceso/Procesar'));
 const LimpiarDatos = lazy(() => import('../pages/dashboard/LimpiarDatos'));
 const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
 
