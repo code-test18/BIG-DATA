@@ -1,3 +1,4 @@
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useState, type SyntheticEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../../services/authService';
@@ -136,8 +137,9 @@ export default function Registro() {
             />
 
             {form.confirmPassword.length > 0 && (
-              <p style={{ fontSize: '12px', marginTop: '4px', color: isMatch ? '#22c55e' : '#ef4444' }}>
-                {isMatch ? '✓ Las contraseñas coinciden' : '✕ Las contraseñas no coinciden'}
+              <p style={{ fontSize: '12px', marginTop: '4px', color: isMatch ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                {isMatch ? <CheckCircle2 size={14} strokeWidth={2.5} /> : <XCircle size={14} strokeWidth={2.5} />}
+                <span>{isMatch ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden'}</span>
               </p>
             )}
           </div>

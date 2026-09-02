@@ -34,12 +34,15 @@ export interface VentaReporte {
   id: string;
   tipo: 'ventas';
   nombreArchivo: string;
+  nombre: string;
+  fecha: string;
   createdAt: string;
-  mapeo: Required<Pick<VentasSelection, 'fecha' | 'categoria' | 'monto'>> &
+  resumen: string;
+  mapeo?: Required<Pick<VentasSelection, 'fecha' | 'categoria' | 'monto'>> &
     Pick<VentasSelection, 'cantidad'>;
-  metricas: MetricasVentas;
-  graficoPorCategoria: PuntoTotal[];
-  graficoPorFecha: PuntoTotal[];
+  metricas: Array<{ label: string; value: string | number }> | MetricasVentas;
+  graficoPorCategoria?: PuntoTotal[];
+  graficoPorFecha?: PuntoTotal[];
   graficoUnidadesPorCategoria?: PuntoTotal[];
-  participacionCategoria: PuntoParticipacion[];
+  participacionCategoria?: PuntoParticipacion[];
 }

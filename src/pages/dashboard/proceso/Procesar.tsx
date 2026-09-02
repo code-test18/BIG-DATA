@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useAnalysis } from '../../../hooks/useAnalysis';
 import type { AnalysisRequest, AnalysisSelection } from '../../../types/analysis';
 import type { DashboardContextType } from '../../../types/csv';
@@ -8,10 +17,9 @@ import { buildComparison } from './ProcesarUtils';
 import InsightsView from './InsightsView';
 
 export default function Procesar() {
-  const { files, activeFileId, setActiveFileId, setAnalysisResult } = useOutletContext<DashboardContextType>();
-  const navigate = useNavigate();
+  const { files, activeFileId, setActiveFileId, analysisResult, setAnalysisResult } = useOutletContext<DashboardContextType>();
   const [selection, setSelection] = useState<AnalysisSelection>({});
-  const [hasProcessed, setHasProcessed] = useState(false);
+  const [analizado, setAnalizado] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'report' | 'insights'>('report');
 
@@ -59,14 +67,14 @@ export default function Procesar() {
   const handleFileChange = (fileId: string) => {
     setActiveFileId(fileId);
     setSelection({});
-    setHasProcessed(false);
+    setAnalizado(false);
     setSelectionError(null);
     clearError();
   };
 
   const handleColumnChange = (role: 'category' | 'metric', value: string) => {
     setSelection((current) => ({ ...current, [role]: value }));
-    setHasProcessed(false);
+    setAnalizado(false);
     setSelectionError(null);
     clearError();
   };
@@ -74,19 +82,61 @@ export default function Procesar() {
   const handleProcess = async () => {
     if (!activeFile) return;
     if (!selection.category || !selection.metric) {
+      setAnalizado(false);
       setSelectionError('Selecciona una categoría y una métrica antes de iniciar el análisis.');
       return;
     }
+
+    setSelectionError(null);
+    setAnalizado(false);
+
     const request: AnalysisRequest = { target: 'dynamic_mapping', columns: selection };
     const result = await runAnalysis(activeFile, request);
+
     if (result) {
       setAnalysisResult(result);
-      setHasProcessed(true);
+      setAnalizado(true);
       localStorage.setItem('reporte_config', JSON.stringify({ ejeX: selection.category, ejeY: selection.metric }));
       if (activeFile.rows) {
         localStorage.setItem('uploaded_csv_data', JSON.stringify(activeFile.rows));
       }
     }
+  };
+
+  const handleExportReport = () => {
+    if (!analysisResult) return;
+
+    const reportToSave = {
+      id: crypto.randomUUID(),
+      tipo: 'ventas',
+      nombreArchivo: analysisResult.sourceFileName,
+      nombre: `Reporte - ${analysisResult.sourceFileName}`,
+      fecha: new Date().toLocaleString(),
+      createdAt: new Date().toISOString(),
+      resumen: `Análisis realizado sobre ${analysisResult.sourceFileName} usando la categoría ${analysisResult.configuration.columns.category} y la métrica ${analysisResult.configuration.columns.metric}.`,
+      metricas: analysisResult.metrics,
+      mapeo: {
+        fecha: analysisResult.configuration.columns.category,
+        categoria: analysisResult.configuration.columns.category,
+        monto: analysisResult.configuration.columns.metric,
+        cantidad: '',
+      },
+      graficoPorCategoria: analysisResult.series.map((item) => ({
+        label: item.label,
+        total: item.value,
+      })),
+      graficoPorFecha: analysisResult.series.map((item) => ({
+        label: item.label,
+        total: item.value,
+      })),
+      participacionCategoria: analysisResult.series.map((item) => ({
+        categoria: item.label,
+        porcentaje: Number(((item.value / Math.max(analysisResult.series.reduce((sum, current) => sum + current.value, 0), 1)) * 100).toFixed(2)),
+      })),
+    };
+
+    const savedReports = JSON.parse(localStorage.getItem('reportes_ventas') ?? '[]');
+    localStorage.setItem('reportes_ventas', JSON.stringify([...savedReports, reportToSave]));
   };
 
   return (
@@ -171,13 +221,73 @@ export default function Procesar() {
                 {(error || selectionError) && <div className="alert-error">{error || selectionError}</div>}
 
                 <button className="btn btn-primary process-btn" onClick={handleProcess} disabled={status === 'loading'}>
-                  {status === 'loading' ? 'Procesando...' : 'Iniciar Análisis'}
+                  {status === 'loading' ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <span className="loading-spinner" aria-label="Cargando" />
+                      Procesando...
+                    </span>
+                  ) : (
+                    'Iniciar Análisis'
+                  )}
                 </button>
 
-                {status === 'success' && hasProcessed && (
-                  <button className="btn btn-secondary report-cta" onClick={() => navigate('/dashboard/reportes')}>
-                    Generar Reporte →
-                  </button>
+                {analizado && analysisResult && (
+                  <section className="report-section" style={{ marginTop: '1.5rem' }}>
+                    <div className="report-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div>
+                        <div className="eyebrow">Resultado del análisis</div>
+                        <h3 style={{ margin: '0.35rem 0 0' }}>{analysisResult.title}</h3>
+                        <p style={{ marginTop: '0.4rem', color: '#64748b' }}>
+                          Fuente: {analysisResult.sourceFileName} · {analysisResult.generatedAt}
+                        </p>
+                      </div>
+
+                      <button className="btn btn-secondary report-cta" onClick={handleExportReport}>
+                        Exportar Reporte
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '1.5rem' }}>
+                      {analysisResult.metrics.map((metric) => (
+                        <div key={metric.label} className="card metric-card" style={{ background: '#fff', border: '1px solid #dbe4ef', borderRadius: '12px', padding: '1rem' }}>
+                          <span style={{ display: 'block', color: '#64748b', fontSize: '0.8rem', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                            {metric.label}
+                          </span>
+                          <strong style={{ display: 'block', marginTop: '0.6rem', fontSize: '1.5rem', color: '#0f172a' }}>
+                            {metric.value}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: '1.75rem', height: '320px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analysisResult.series} margin={{ top: 8, right: 12, left: 0, bottom: 12 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#dbe4ef" />
+                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#475569' }} angle={-18} textAnchor="end" height={60} />
+                          <YAxis tick={{ fontSize: 11, fill: '#475569' }} />
+                          <Tooltip formatter={(value: unknown) => {
+                            const raw = Array.isArray(value) ? value[0] : value;
+                            const numeric = Number(raw ?? 0);
+                            return [numeric.toLocaleString(), 'Valor'] as [string, string];
+                          }} />
+                          <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #dbe4ef', borderRadius: '10px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                        <strong style={{ color: '#0f172a' }}>Configuración aplicada</strong>
+                        <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Registros analizados: {analysisResult.processedRows}</span>
+                      </div>
+                      <div className="config-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem' }}>
+                        <span>Categoría: {analysisResult.configuration.columns.category}</span>
+                        <span>Métrica: {analysisResult.configuration.columns.metric}</span>
+                        <span>Target: {analysisResult.target}</span>
+                      </div>
+                    </div>
+                  </section>
                 )}
               </section>
             )}

@@ -1,3 +1,4 @@
+import { Upload } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useCsvCleaning } from '../../hooks/useCsvCleaning';
@@ -58,7 +59,10 @@ function LimpiarDatos() {
       <h2>Carga y limpieza</h2>
       <p>Sube un CSV para consultar su calidad antes de aplicar cambios.</p>
       <div className="upload-box">
-        <label htmlFor="clean-csv-input" className="btn btn-primary upload-btn">📂 Subir CSV</label>
+        <label htmlFor="clean-csv-input" className="btn btn-primary upload-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Upload size={16} strokeWidth={2.2} />
+          Subir CSV
+        </label>
         <input id="clean-csv-input" type="file" accept=".csv" onChange={handleUpload} style={{ display: 'none' }} />
       </div>
       {status === 'loading' && <div className="alert-success">Analizando el archivo...</div>}

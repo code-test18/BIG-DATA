@@ -18,6 +18,13 @@ function getCell(file: CsvFile, row: string[], header?: string): string {
   return index >= 0 ? (row[index] ?? '').trim() : '';
 }
 
+function formatMetricValue(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(2)}K`;
+  return value % 1 === 0 ? String(value) : value.toFixed(2);
+}
+
 export function validateAnalysis(file: CsvFile | undefined, target: AnalysisTarget | undefined, selection: AnalysisSelection): AnalysisValidation {
   if (!file) return { valid: false, message: 'No hay un CSV disponible para analizar.' };
   if (!file.headers.length) return { valid: false, message: 'El CSV no contiene headers utilizables.' };
@@ -34,23 +41,40 @@ export function validateAnalysis(file: CsvFile | undefined, target: AnalysisTarg
 export function processAnalysis(file: CsvFile, request: AnalysisRequest): AnalysisResult {
   const category = request.columns.category;
   const metric = request.columns.metric;
+  const operation = request.operation ?? 'SUM';
   if (!category || !metric) throw new Error('La configuración del análisis está incompleta.');
 
-  const totals = new Map<string, number>();
+  const grouped = new Map<string, number[]>();
   let processedRows = 0;
+
   file.rows.forEach((row) => {
     const categoryValue = getCell(file, row, category);
     const metricValue = parseNumber(getCell(file, row, metric));
     if (!categoryValue || metricValue === null) return;
-    totals.set(categoryValue, (totals.get(categoryValue) ?? 0) + metricValue);
+
+    const values = grouped.get(categoryValue) ?? [];
+    values.push(metricValue);
+    grouped.set(categoryValue, values);
     processedRows += 1;
   });
 
-  const series = [...totals.entries()]
-    .map(([label, value]) => ({ label, value }))
+  const series = [...grouped.entries()]
+    .map(([label, values]) => {
+      const rawValue = operation === 'COUNT'
+        ? values.length
+        : operation === 'AVG'
+          ? values.reduce((sum, value) => sum + value, 0) / values.length
+          : values.reduce((sum, value) => sum + value, 0);
+
+      return { label, value: rawValue };
+    })
     .sort((left, right) => right.value - left.value)
-    .slice(0, 20);
-  const total = [...totals.values()].reduce((sum, value) => sum + value, 0);
+    .slice(0, 10);
+
+  const total = series.reduce((sum, item) => sum + item.value, 0);
+  const top = series[0];
+
+  const metricLabel = operation === 'SUM' ? `Total de ${metric}` : operation === 'AVG' ? `Promedio de ${metric}` : `Conteo de ${metric}`;
 
   return {
     target: 'dynamic_mapping',
@@ -59,8 +83,9 @@ export function processAnalysis(file: CsvFile, request: AnalysisRequest): Analys
     configuration: request,
     metrics: [
       { label: 'Registros procesados', value: processedRows },
-      { label: 'Categorías encontradas', value: totals.size },
-      { label: `Total de ${metric}`, value: total.toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+      { label: 'Categorías únicas', value: grouped.size },
+      { label: metricLabel, value: formatMetricValue(total) },
+      { label: 'Top categoría', value: top ? top.label : 'N/A' },
     ],
     series,
     processedRows,

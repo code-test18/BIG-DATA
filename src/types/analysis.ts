@@ -5,6 +5,11 @@ export type FieldRole =
   | 'category'
   | 'metric';
 
+export type AnalysisOperation =
+  | 'SUM'
+  | 'AVG'
+  | 'COUNT';
+
 export type Grouping =
   | 'none'
   | 'sum'
@@ -19,6 +24,8 @@ export interface AnalysisRequest {
   target: AnalysisTarget;
 
   columns: AnalysisSelection;
+
+  operation?: AnalysisOperation;
 
   grouping?: string;
 }

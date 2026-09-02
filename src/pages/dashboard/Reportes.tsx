@@ -1,289 +1,106 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { DashboardContextType } from '../../types/csv';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { Bar, Line } from 'react-chartjs-2';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import type { VentaReporte } from '../../types/ventas';
+import { obtenerReportes } from '../../utils/reportesStorage';
 
 export default function Reportes() {
-  const { files, activeFileId } = useOutletContext<DashboardContextType>();
+  const { activeFileId } = useOutletContext<DashboardContextType>();
+  const [reporteSeleccionado, setReporteSeleccionado] = useState<VentaReporte | null>(null);
 
-  const cleanFiles = files.filter((f) => f.isClean);
-  const activeFile = cleanFiles.find((f) => f.id === activeFileId) ?? cleanFiles[0];
+  const reportes = useMemo(() => obtenerReportes(), [activeFileId]);
 
-  const defaultHeaderX = activeFile?.headers?.[0] ?? '';
-  const defaultHeaderY = activeFile?.headers?.[1] ?? activeFile?.headers?.[0] ?? '';
-
-  const [ejeX, setEjeX] = useState<string>(defaultHeaderX);
-  const [ejeY, setEjeY] = useState<string>(defaultHeaderY);
-  const [tipoGrafico, setTipoGrafico] = useState<'Barra' | 'Línea'>('Barra');
-
-  const currentEjeX = ejeX || defaultHeaderX;
-  const currentEjeY = ejeY || defaultHeaderY;
-
-  // Tipado correcto (Unknown / Record) para evitar la regla de 'any'
-  const getValueFromRow = (
-    row: unknown,
-    targetHeader: string,
-    headers: string[]
-  ): string | number | undefined => {
-    if (!row || !targetHeader) return undefined;
-
-    const normalize = (str: string) =>
-      str
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '');
-
-    const targetNorm = normalize(targetHeader);
-
-    if (Array.isArray(row)) {
-      const index = headers.findIndex((h) => normalize(h) === targetNorm);
-      return index !== -1 ? row[index] : undefined;
-    }
-
-    if (typeof row === 'object' && row !== null) {
-      const obj = row as Record<string, string | number>;
-      if (obj[targetHeader] !== undefined) return obj[targetHeader];
-      const matchedKey = Object.keys(obj).find((k) => normalize(k) === targetNorm);
-      return matchedKey ? obj[matchedKey] : undefined;
-    }
-
-    return undefined;
+  const abrirReporte = (reporte: VentaReporte) => {
+    setReporteSeleccionado(reporte);
   };
 
-  const { labels, numericValues, totalRegistros } = useMemo(() => {
-    if (!activeFile || !activeFile.rows || !currentEjeX) {
-      return { labels: [], numericValues: [], totalRegistros: 0 };
-    }
-
-    const counts: Record<string, number> = {};
-    let total = 0;
-
-    activeFile.rows.forEach((row) => {
-      const rawX = getValueFromRow(row, currentEjeX, activeFile.headers);
-      const labelStr =
-        rawX !== undefined && rawX !== null && String(rawX).trim() !== ''
-          ? String(rawX).trim()
-          : 'Sin Clasificar';
-
-      counts[labelStr] = (counts[labelStr] || 0) + 1;
-      total++;
-    });
-
-    const entries = Object.entries(counts).slice(0, 25);
-
-    return {
-      labels: entries.map(([label]) => label),
-      numericValues: entries.map(([, count]) => count),
-      totalRegistros: total,
-    };
-  }, [activeFile, currentEjeX]);
-
-  const stats = useMemo(() => {
-    if (!numericValues.length) return { promedio: '0', suma: 0, max: 0, min: 0 };
-    const sumaValues = numericValues.reduce((a, b) => a + b, 0);
-    return {
-      promedio: (sumaValues / numericValues.length).toFixed(1),
-      suma: totalRegistros,
-      max: Math.max(...numericValues),
-      min: Math.min(...numericValues),
-    };
-  }, [numericValues, totalRegistros]);
-
-  if (!activeFile || !activeFile.rows || activeFile.rows.length === 0) {
+  if (!reportes.length) {
     return (
       <div style={{ padding: '32px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>Informes y Visualización</h2>
-        <p style={{ color: '#64748b' }}>No hay datos disponibles para mostrar.</p>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>Reportes exportados</h2>
+        <p style={{ color: '#64748b' }}>Todavía no exportaste ningún reporte. Cuando lo hagas aparecerá aquí.</p>
       </div>
     );
   }
 
   return (
     <div style={{ padding: '32px', fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      
-      {/* Tarjetas Superiores */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>Promedio / Categoría</span>
-          <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 700, color: '#2563eb' }}>
-            {stats.promedio}
-          </h3>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>Registros totales</span>
-          <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 700, color: '#10b981' }}>
-            {stats.suma}
-          </h3>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>Máx. por Categoría</span>
-          <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 700, color: '#ef4444' }}>
-            {stats.max}
-          </h3>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>Mín. por Categoría</span>
-          <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 700, color: '#f59e0b' }}>
-            {stats.min}
-          </h3>
-        </div>
-      </div>
-
-      {/* Contenedor del Gráfico */}
-      <div style={{ backgroundColor: '#ffffff', padding: '28px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <h3 style={{ marginTop: 0, marginBottom: '24px', fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
-          Configuración del Gráfico
-        </h3>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+      <div style={{ display: 'grid', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#475569', display: 'block', marginBottom: '8px' }}>
-              Eje X (Agrupar por):
-            </label>
-            <select
-              value={currentEjeX}
-              onChange={(e) => setEjeX(e.target.value)}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                width: '100%',
-                outline: 'none',
-                fontSize: '14px',
-              }}
-            >
-              {activeFile.headers.map((col) => (
-                <option key={col} value={col}>{col}</option>
+            <h2 style={{ margin: 0, color: '#0f172a' }}>Reportes exportados</h2>
+            <p style={{ margin: '0.5rem 0 0', color: '#64748b' }}>Selecciona un reporte para verlo en detalle.</p>
+          </div>
+        </div>
+
+        {!reportes.length ? (
+          <div style={{ padding: '2rem', border: '1px solid #dbe4ef', borderRadius: '12px', background: '#fff', color: '#64748b', textAlign: 'center' }}>
+            Todavía no exportaste ningún reporte. Cuando lo hagas aparecerá aquí.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 320px) 1fr', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {reportes.map((reporte) => (
+                <button
+                  key={reporte.id}
+                  type="button"
+                  onClick={() => abrirReporte(reporte)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    border: `1px solid ${reporteSeleccionado?.id === reporte.id ? '#2563eb' : '#dbe4ef'}`,
+                    background: reporteSeleccionado?.id === reporte.id ? '#eff6ff' : '#fff',
+                    cursor: 'pointer',
+                    color: '#0f172a',
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>{reporte.nombre}</div>
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.8rem', color: '#64748b' }}>{reporte.fecha}</div>
+                </button>
               ))}
-            </select>
-          </div>
+            </div>
 
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#475569', display: 'block', marginBottom: '8px' }}>
-              Métrica / Conteo:
-            </label>
-            <select
-              value={currentEjeY}
-              onChange={(e) => setEjeY(e.target.value)}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                width: '100%',
-                outline: 'none',
-                fontSize: '14px',
-              }}
-            >
-              {activeFile.headers.map((col) => (
-                <option key={col} value={col}>Cantidad de {col}</option>
-              ))}
-            </select>
-          </div>
+            <div style={{ background: '#fff', border: '1px solid #dbe4ef', borderRadius: '12px', padding: '1.25rem' }}>
+              {!reporteSeleccionado ? (
+                <div style={{ color: '#64748b', padding: '1rem 0' }}>
+                  Elige un reporte de la lista para ver sus detalles.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', color: '#2563eb', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Reporte seleccionado
+                      </div>
+                      <h3 style={{ margin: '0.35rem 0 0', color: '#0f172a' }}>{reporteSeleccionado.nombre}</h3>
+                    </div>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{reporteSeleccionado.fecha}</span>
+                  </div>
 
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#475569', display: 'block', marginBottom: '8px' }}>
-              Tipo de Gráfico:
-            </label>
-            <select
-              value={tipoGrafico}
-              onChange={(e) => setTipoGrafico(e.target.value as 'Barra' | 'Línea')}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                width: '100%',
-                outline: 'none',
-                fontSize: '14px',
-              }}
-            >
-              <option value="Barra">Barra</option>
-              <option value="Línea">Línea</option>
-            </select>
-          </div>
-        </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+                    {(Array.isArray(reporteSeleccionado.metricas)
+                      ? reporteSeleccionado.metricas
+                      : Object.entries(reporteSeleccionado.metricas).map(([label, value]) => ({ label, value })))
+                      .map((metrica) => (
+                        <div key={metrica.label} style={{ border: '1px solid #dbe4ef', borderRadius: '10px', background: '#f8fafc', padding: '1rem' }}>
+                          <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{metrica.label}</div>
+                          <div style={{ marginTop: '0.5rem', fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>{metrica.value}</div>
+                        </div>
+                      ))}
+                  </div>
 
-        <div style={{ height: '420px', width: '100%' }}>
-          {tipoGrafico === 'Barra' ? (
-            <Bar
-              data={{
-                labels,
-                datasets: [
-                  {
-                    label: `Cantidad de registros por ${currentEjeX}`,
-                    data: numericValues,
-                    backgroundColor: '#3b82f6',
-                    borderColor: '#2563eb',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                  },
-                ],
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#334155', font: { size: 12 } } } },
-                scales: {
-                  x: { ticks: { color: '#64748b', maxRotation: 45, minRotation: 45 }, grid: { color: '#f1f5f9' } },
-                  y: { ticks: { color: '#64748b', precision: 0 }, grid: { color: '#e2e8f0' }, beginAtZero: true },
-                },
-              }}
-            />
-          ) : (
-            <Line
-              data={{
-                labels,
-                datasets: [
-                  {
-                    label: `Cantidad de registros por ${currentEjeX}`,
-                    data: numericValues,
-                    backgroundColor: '#3b82f6',
-                    borderColor: '#2563eb',
-                    borderWidth: 2,
-                    tension: 0.3,
-                  },
-                ],
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#334155', font: { size: 12 } } } },
-                scales: {
-                  x: { ticks: { color: '#64748b', maxRotation: 45, minRotation: 45 }, grid: { color: '#f1f5f9' } },
-                  y: { ticks: { color: '#64748b', precision: 0 }, grid: { color: '#e2e8f0' }, beginAtZero: true },
-                },
-              }}
-            />
-          )}
-        </div>
+                  <div style={{ marginTop: '1.5rem', border: '1px solid #dbe4ef', borderRadius: '10px', background: '#f8fafc', padding: '1rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700 }}>
+                      Resumen
+                    </div>
+                    <p style={{ margin: '0.8rem 0 0', color: '#334155', lineHeight: 1.6 }}>{reporteSeleccionado.resumen}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
