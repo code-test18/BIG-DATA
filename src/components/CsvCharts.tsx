@@ -11,6 +11,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import { Check } from 'lucide-react';
 
 import type { CsvCleaningSummary } from '../services/csvCleaningService';
 
@@ -307,7 +308,7 @@ function CsvCharts({
             </div>
 
             <div className="chart-icon quality-icon">
-              ✓
+              <Check size={18} strokeWidth={2.5} />
             </div>
 
           </div>

@@ -1,3 +1,4 @@
+import { Check, Save } from 'lucide-react';
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
@@ -61,6 +62,9 @@ function Ventas() {
       id: crypto.randomUUID(),
       tipo: 'ventas',
       nombreArchivo: activeFile.name,
+      nombre: `Ventas - ${activeFile.name}`,
+      fecha: new Date().toLocaleString(),
+      resumen: `Análisis comercial para ${activeFile.name} usando ${mapeoCompleto.categoria} como categoría y ${mapeoCompleto.monto} como monto.`,
       createdAt: new Date().toISOString(),
       mapeo: mapeoCompleto,
       metricas: resultado.metricas,
@@ -288,8 +292,8 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
         </div>
       )}
 
-      <button className="btn btn-secondary report-cta" onClick={onGuardar} disabled={guardado}>
-        {guardado ? 'Reporte guardado ✓' : 'Guardar Reporte'}
+      <button className="btn btn-secondary report-cta" onClick={onGuardar} disabled={guardado} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+        {guardado ? <><Check size={16} strokeWidth={2.5} /> Reporte guardado</> : <><Save size={16} strokeWidth={2.2} /> Guardar Reporte</>}
       </button>
     </div>
   );

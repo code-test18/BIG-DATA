@@ -163,18 +163,18 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
   if (rowDifference !== 0) {
     const direction = rowDifference > 0 ? 'incrementó' : 'redujo';
     insights.push(
-      `📊 **Volumen de datos:** El Dataset B ${direction} en **${Math.abs(rowDifference)} registros** (${Math.abs(rowDifferencePct).toFixed(1)}% respecto a A).`
+      `**Volumen de datos:** El Dataset B ${direction} en **${Math.abs(rowDifference)} registros** (${Math.abs(rowDifferencePct).toFixed(1)}% respecto a A).`
     );
   } else {
-    insights.push(`📊 **Volumen de datos:** Ambos datasets mantienen exactamente la misma cantidad de registros (${rowsA}).`);
+    insights.push(`**Volumen de datos:** Ambos datasets mantienen exactamente la misma cantidad de registros (${rowsA}).`);
   }
 
   // 2. Estructura de Columnas
   if (newColumnsInB.length > 0) {
-    insights.push(`➕ **Nuevas columnas en B:** Se añadieron ${newColumnsInB.length} columna(s): \`${newColumnsInB.join(', ')}\`.`);
+    insights.push(`**Nuevas columnas en B:** Se añadieron ${newColumnsInB.length} columna(s): \`${newColumnsInB.join(', ')}\`.`);
   }
   if (missingInB.length > 0) {
-    insights.push(`⚠️ **Columnas eliminadas en B:** Desaparecieron ${missingInB.length} columna(s) presentes en A: \`${missingInB.join(', ')}\`.`);
+    insights.push(`**Columnas eliminadas en B:** Desaparecieron ${missingInB.length} columna(s) presentes en A: \`${missingInB.join(', ')}\`.`);
   }
 
   // 3. Insight Comercial: Análisis Financiero / Facturación Total
@@ -189,11 +189,11 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
 
     if (diffSales > 0) {
       insights.push(
-        `💵 **Facturación Total:** Las ventas registradas subieron **+$${diffSales.toFixed(2)} USD** en B (+${diffSalesPct}% respecto a A).`
+        `**Facturación Total:** Las ventas registradas subieron **+$${diffSales.toFixed(2)} USD** en B (+${diffSalesPct}% respecto a A).`
       );
     } else if (diffSales < 0) {
       insights.push(
-        `🔻 **Facturación Total:** Las ventas cayeron **-$${Math.abs(diffSales).toFixed(2)} USD** en B (${diffSalesPct}% respecto a A).`
+        `**Facturación Total:** Las ventas cayeron **-$${Math.abs(diffSales).toFixed(2)} USD** en B (${diffSalesPct}% respecto a A).`
       );
     }
   }
@@ -211,7 +211,7 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
     const topCategory = Object.entries(salesByCategory).sort((a, b) => b[1] - a[1])[0];
     if (topCategory) {
       insights.push(
-        `🛍️ **Categoría Líder (Dataset B):** **"${topCategory[0]}"** es la de mayor volumen comercial con **$${topCategory[1].toFixed(2)} USD**.`
+        `**Categoría Líder (Dataset B):** **"${topCategory[0]}"** es la de mayor volumen comercial con **$${topCategory[1].toFixed(2)} USD**.`
       );
     }
   }
@@ -223,14 +223,14 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
     const total = datasetB.rows.length;
     if (total > 0) {
       const femalePct = ((females / total) * 100).toFixed(1);
-      insights.push(`👥 **Perfil del Cliente:** El **${femalePct}%** de los registros en el Dataset B corresponden a clientes mujeres.`);
+      insights.push(`**Perfil del Cliente:** El **${femalePct}%** de los registros en el Dataset B corresponden a clientes mujeres.`);
     }
   }
 
   // 6. Duplicados y Nulos
   if (metricsB.duplicates > metricsA.duplicates) {
     insights.push(
-      `🚨 **Alerta de duplicados:** Dataset B contiene **${metricsB.duplicates} filas duplicadas** (Dataset A tenía ${metricsA.duplicates}).`
+      `**Alerta de duplicados:** Dataset B contiene **${metricsB.duplicates} filas duplicadas** (Dataset A tenía ${metricsA.duplicates}).`
     );
   }
 
@@ -239,7 +239,7 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
   );
   if (columnsWithMoreNulls.length > 0) {
     const colNames = columnsWithMoreNulls.map((c) => c.column).join(', ');
-    insights.push(`⚠️ **Vacíos en aumento:** Se detectó un incremento de nulos en la(s) columna(s): \`${colNames}\`.`);
+    insights.push(`**Vacíos en aumento:** Se detectó un incremento de nulos en la(s) columna(s): \`${colNames}\`.`);
   }
 
   // 7. Inconsistencia de Tipos de Datos
@@ -249,7 +249,7 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
   if (typeMismatches.length > 0) {
     typeMismatches.forEach((m) => {
       insights.push(
-        `🚨 **Incompatibilidad de Tipo:** La columna **"${m.column}"** cambió de tipo **${m.typeA}** (en A) a **${m.typeB}** (en B).`
+        `**Incompatibilidad de Tipo:** La columna **"${m.column}"** cambió de tipo **${m.typeA}** (en A) a **${m.typeB}** (en B).`
       );
     });
   }
@@ -265,7 +265,7 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
         if (Math.abs(diffPct) >= 10) {
           const trend = diffPct > 0 ? 'subió' : 'cayó';
           insights.push(
-            `📈 **Variación de promedio:** La media de **"${r.column}"** ${trend} un **${Math.abs(diffPct).toFixed(1)}%** (de ${r.mediaA} en A a ${r.mediaB} en B).`
+            `**Variación de promedio:** La media de **"${r.column}"** ${trend} un **${Math.abs(diffPct).toFixed(1)}%** (de ${r.mediaA} en A a ${r.mediaB} en B).`
           );
         }
       }
@@ -275,7 +275,7 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
   if (qualityDelta !== 0) {
     const statusText = qualityDelta > 0 ? 'mejoró' : 'empeoró';
     insights.push(
-      `✨ **Score de Calidad:** La calidad general del archivo ${statusText} **${Math.abs(qualityDelta).toFixed(1)} puntos** (A: ${metricsA.quality}% vs B: ${metricsB.quality}%).`
+      `**Score de Calidad:** La calidad general del archivo ${statusText} **${Math.abs(qualityDelta).toFixed(1)} puntos** (A: ${metricsA.quality}% vs B: ${metricsB.quality}%).`
     );
   }
 
