@@ -2,13 +2,18 @@ import { useState, useEffect, useRef, type SyntheticEvent, type KeyboardEvent } 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 
+const RESEND_AVAILABLE_AT_KEY = 'otp_resend_available_at';
+const OTP_VALIDITY_SECONDS = 60;
+const RESEND_COOLDOWN_SECONDS = 180;
+
 export default function Otp() {
   // --- ESTADOS ---
   const [otp, setOtp] = useState<string[]>(Array(6).fill('')); // Arreglo para los 6 dígitos del OTP
   const [error, setError] = useState<string | null>(null);     // Mensaje de error para la alerta
   const [loading, setLoading] = useState(false);               // Estado de carga para deshabilitar botones
-  const [timeLeft, setTimeLeft] = useState(180);               // Tiempo de validez del código (3 minutos)
-  const [cooldown, setCooldown] = useState(0);                  // Tiempo de bloqueo para reenviar (máx. 5 min)
+  const [timeLeft, setTimeLeft] = useState(OTP_VALIDITY_SECONDS); // Tiempo de validez del código (1 minuto)
+  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null); // Mensaje de éxito/información
 
   // Referencia para manipular el foco táctil de cada input dinámicamente
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
@@ -16,16 +21,24 @@ export default function Otp() {
   const navigate = useNavigate();
   const userId = state?.userId as string | undefined;
 
-  // --- TEMPORIZADOR GLOBAL ---
+  // --- TEMPORIZADOR GLOBAL (REVERSA / CUENTA REGRESIVA) ---
   useEffect(() => {
+    const availableAt = Number(localStorage.getItem(RESEND_AVAILABLE_AT_KEY));
+    if (!availableAt || availableAt <= Date.now()) {
+      localStorage.setItem(RESEND_AVAILABLE_AT_KEY, String(Date.now() + RESEND_COOLDOWN_SECONDS * 1000));
+    }
+
     const timer = setInterval(() => {
-      setTimeLeft((p) => (p > 0 ? p - 1 : 0));
-      setCooldown((p) => (p > 0 ? p - 1 : 0));
+      setTimeLeft((previous) => (previous > 0 ? previous - 1 : 0));
+      setCooldown(() => {
+        const resendAvailableAt = Number(localStorage.getItem(RESEND_AVAILABLE_AT_KEY));
+        return resendAvailableAt > Date.now() ? Math.ceil((resendAvailableAt - Date.now()) / 1000) : 0;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Convierte segundos a formato "X min Ys"
+  // Convierte segundos a formato "X min Ys" o "MM:SS"
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
@@ -50,6 +63,7 @@ export default function Otp() {
     if (!userId) return setError('No se encontró el usuario.');
     setLoading(true);
     setError(null);
+    setInfoMessage(null);
     
     try {
       const res = await authService.verifyOtp({ userId, code: otp.join('') }) as { token?: string; accessToken?: string };
@@ -65,22 +79,33 @@ export default function Otp() {
 
   const handleResend = async () => {
     if (!userId || loading || cooldown > 0) return;
+
+    const availableAt = Number(localStorage.getItem(RESEND_AVAILABLE_AT_KEY));
+    if (availableAt > Date.now()) {
+      setCooldown(Math.ceil((availableAt - Date.now()) / 1000));
+      return;
+    }
+
     setLoading(true);
     setError(null);
+    setInfoMessage(null);
 
     try {
       await authService.resendOtp({ userId });
-      setCooldown(300);  // Bloquea el botón por 5 minutos
-      setTimeLeft(180);  // Reinicia los 3 minutos de validez del OTP
+      setCooldown(RESEND_COOLDOWN_SECONDS);  // Bloquea el botón por 3 minutos
+      localStorage.setItem(RESEND_AVAILABLE_AT_KEY, String(Date.now() + RESEND_COOLDOWN_SECONDS * 1000));
+      setTimeLeft(OTP_VALIDITY_SECONDS);  // Reinicia el minuto de validez del OTP
       setOtp(Array(6).fill(''));
+      setInfoMessage('Nuevo código enviado a tu correo.');
+      inputsRef.current[0]?.focus();
     } catch (err) {
       let msg = err instanceof Error ? err.message : 'Error al reenviar.';
       
       const match = msg.match(/(\d+)\s*segundos/i);
       if (match && match[1]) {
-        const cappedSeconds = Math.min(parseInt(match[1], 10), 300);
-        setCooldown(cappedSeconds); // Se activa el contador dinámico
-        setError(null);             // Limpiamos el error en texto porque el botón ya indicará la espera
+        const cappedSeconds = Math.min(parseInt(match[1], 10), RESEND_COOLDOWN_SECONDS);
+        setCooldown(cappedSeconds); // Se activa el contador dinámico de reversa
+        setError(null);
       } else {
         setError(msg);
       }
@@ -89,16 +114,15 @@ export default function Otp() {
     }
   };
 
-  const isResendDisabled = loading || cooldown > 0;
-
   return (
     <section className="page auth-container">
       <div className="auth-card">
         <h2>Verificar código</h2>
         <p className="auth-subtitle">Ingresa el código OTP enviado a tu correo.</p>
 
-        {/* Solo mostramos la alerta de error si no hay un contador de espera activo */}
-        {error && cooldown === 0 && <div className="alert-error">{error}</div>}
+        {/* Alertas */}
+        {error && <div className="alert-error">{error}</div>}
+        {infoMessage && <div className="alert-success" style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', fontSize: '0.85rem', borderRadius: '8px' }}>{infoMessage}</div>}
 
         <form onSubmit={handleSubmit}>
           {/* Casillas de OTP */}
@@ -118,8 +142,8 @@ export default function Otp() {
           </div>
 
           {/* Único indicador de validez del código */}
-          <div style={{ textAlign: 'center', fontSize: '13px', marginBottom: '15px' }}>
-            <p>Tiempo restante: <strong>{formatTime(timeLeft)}</strong></p>
+          <div style={{ textAlign: 'center', fontSize: '13px', marginBottom: '15px', color: '#64748b' }}>
+            <p>Tiempo de validez: <strong style={{ color: timeLeft < 30 ? '#dc2626' : '#0f172a' }}>{formatTime(timeLeft)}</strong></p>
           </div>
 
           {/* Botón principal */}
@@ -128,15 +152,15 @@ export default function Otp() {
           </button>
         </form>
 
-        {/* Botón de reenvío */}
         <button
           type="button"
-          className="btn btn-secondary"
+          className="btn btn-secondary resend-button"
           onClick={handleResend}
-          disabled={isResendDisabled}
-          style={{ marginTop: '10px', width: '100%', opacity: isResendDisabled ? 0.6 : 1 }}
+          disabled={loading || cooldown > 0}
+          aria-live="polite"
+          style={{ marginTop: '10px', width: '100%', opacity: loading || cooldown > 0 ? 0.65 : 1 }}
         >
-          {cooldown > 0 ? `Reenviar disponible en: ${formatTime(cooldown)}` : 'Reenviar código'}
+          {cooldown > 0 ? `Reenviar código en: ${formatTime(cooldown)}` : 'Reenviar código'}
         </button>
       </div>
     </section>

@@ -14,6 +14,7 @@ export interface DashboardContextType {
   activeFileId: string | null;
   addFile: (file: CsvFile) => void;
   updateFile: (updatedFile: CsvFile) => void;
+  removeFile: (fileId: string) => void;
   setActiveFileId: (id: string) => void;
   analysisResult: AnalysisResult | null;
   setAnalysisResult: (result: AnalysisResult | null) => void;
