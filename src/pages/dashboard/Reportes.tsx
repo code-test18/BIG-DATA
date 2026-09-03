@@ -30,10 +30,10 @@ import {
 } from 'recharts';
 import type { DashboardContextType } from '../../types/csv';
 
-import type { VentaReporte } from '../../types/ventas';
-import { obtenerReportes } from '../../utils/reportesStorage';
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { MetricasVentas, PuntoParticipacion, VentaReporte } from '../../types/ventas';
+import { eliminarReporte, obtenerReportes } from '../../utils/reportesStorage';
 
+const COLORES_PASTEL = ['#2563eb', '#60a5fa', '#93c5fd', '#d946ef', '#e879f9', '#f0abfc'];
 
 export default function Reportes() {
   const { activeFileId } = useOutletContext<DashboardContextType>();
@@ -448,11 +448,22 @@ export default function Reportes() {
                     <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a' }}>Unidades por Categoría</h4>
                   </div>
 
-                  <ReporteGraficos reporte={reporteSeleccionado} />
-                </>
-
+                  <div style={{ height: '240px', width: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={reporteActual.graficoUnidadesPorCategoria}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="label" />
+                        <YAxis />
+                        <Tooltip formatter={(value: unknown) => [Number(value ?? 0).toLocaleString(), 'Unidades']} />
+                        <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               )}
             </div>
+
+            <ReporteGraficos reporte={reporteActual} />
 
             {/* RESUMEN DEL REPORTE */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem' }}>
