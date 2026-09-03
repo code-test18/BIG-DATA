@@ -1,5 +1,110 @@
 import Papa from 'papaparse';
-import type { ParsedDataset, DatasetComparison, ComparisonRow } from './ProcesarTypes';
+import type { DatasetMetrics, ParsedDataset, DatasetComparison, ComparisonRow } from './ProcesarTypes';
+
+const EMPTY_METRICS: DatasetMetrics = {
+  totalIngresos: 0,
+  totalUnidades: 0,
+  ticketPromedio: 0,
+  productosDistintos: 0,
+  categories: {},
+  monthly: {},
+  topProducts: [],
+  hasDescuentos: false,
+  totalDescuentos: 0,
+  hasCanalVenta: false,
+  canalVentaStats: {},
+};
+
+const parseMetric = (value: unknown, fallback = 0): number => {
+  const parsed = normalizeNumber(String(value ?? ''));
+  return parsed ?? fallback;
+};
+
+const getMonthKey = (value: unknown): string => {
+  const rawDate = String(value ?? '').trim();
+  if (!rawDate) return '';
+
+  const isoMatch = rawDate.match(/^(\d{4})[-/](\d{1,2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}`;
+
+  const dayFirstMatch = rawDate.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  return dayFirstMatch ? `${dayFirstMatch[3]}-${dayFirstMatch[2].padStart(2, '0')}` : rawDate.slice(0, 7);
+};
+
+export const processDataset = (rows: string[][], headers: string[]): DatasetMetrics => {
+  if (!rows.length) return { ...EMPTY_METRICS };
+
+  const columnIndex = new Map(headers.map((header, index) => [header.toLowerCase(), index]));
+  const read = (row: string[], column: string): string => row[columnIndex.get(column) ?? -1] ?? '';
+  const productMap: Record<string, { unidades: number; ingresos: number }> = {};
+  const categories: Record<string, number> = {};
+  const monthly: Record<string, number> = {};
+  const canalVentaStats: Record<string, number> = {};
+  let totalIngresos = 0;
+  let totalUnidades = 0;
+  let totalDescuentos = 0;
+
+  const hasDescuentos = columnIndex.has('descuento_aplicado');
+  const hasCanalVenta = columnIndex.has('canal_venta');
+
+  rows.forEach((row) => {
+    const ingreso = parseMetric(read(row, 'ingreso_total'));
+    const unidades = parseMetric(read(row, 'unidades_vendidas'), 1);
+    const producto = read(row, 'producto').trim();
+    const categoria = read(row, 'categoria').trim();
+    const month = getMonthKey(read(row, 'fecha'));
+
+    totalIngresos += ingreso;
+    totalUnidades += unidades;
+    if (hasDescuentos) totalDescuentos += parseMetric(read(row, 'descuento_aplicado'));
+
+    if (producto) {
+      productMap[producto] ??= { unidades: 0, ingresos: 0 };
+      productMap[producto].unidades += unidades;
+      productMap[producto].ingresos += ingreso;
+    }
+    if (categoria) categories[categoria] = (categories[categoria] ?? 0) + ingreso;
+    if (month) monthly[month] = (monthly[month] ?? 0) + ingreso;
+
+    const canal = read(row, 'canal_venta').trim();
+    if (hasCanalVenta && canal) canalVentaStats[canal] = (canalVentaStats[canal] ?? 0) + ingreso;
+  });
+
+  return {
+    totalIngresos,
+    totalUnidades,
+    ticketPromedio: totalIngresos / rows.length,
+    productosDistintos: Object.keys(productMap).length,
+    categories,
+    monthly,
+    topProducts: Object.entries(productMap)
+      .map(([producto, data]) => ({ producto, ...data }))
+      .sort((a, b) => b.ingresos - a.ingresos)
+      .slice(0, 5),
+    hasDescuentos,
+    totalDescuentos,
+    hasCanalVenta,
+    canalVentaStats,
+  };
+};
+
+// Helper para detectar celdas consideradas como NULO (incluyendo limpiezas previas como N/A o 0 imputado)
+export const isNullValue = (value: string | number, isNumericColumn: boolean = false): boolean => {
+  if (value === null || value === undefined) return true;
+  const strVal = String(value).trim().toLowerCase();
+
+  // Marcas de texto comúnmente usadas como nulos
+  if (['', 'null', 'nil', 'none', 'n/a', 'na', 'nan', 'undefined', '-'].includes(strVal)) {
+    return true;
+  }
+
+  // En columnas numéricas, el '0' proviene de una imputación de nulo
+  if (isNumericColumn && strVal === '0') {
+    return true;
+  }
+
+  return false;
+};
 
 export const parseCsvDataset = (file: File): Promise<ParsedDataset> =>
   new Promise((resolve, reject) => {
@@ -42,7 +147,7 @@ export const normalizeNumber = (value: string): number | null => {
 };
 
 export const inferTypeFromValues = (values: string[]): string => {
-  const usableValues = values.filter((value) => value.trim() !== '');
+  const usableValues = values.filter((value) => !isNullValue(value));
   if (usableValues.length === 0) return 'desconocido';
 
   const numericValues = usableValues.map((value) => normalizeNumber(value)).filter((value) => value !== null);
@@ -59,7 +164,8 @@ export const inferTypeFromValues = (values: string[]): string => {
   return 'texto';
 };
 
-export const mean = (values: number[]): number => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
+export const mean = (values: number[]): number => 
+  (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
 
 export const formatMetric = (value: number): string => {
   if (!Number.isFinite(value)) return '0';
@@ -78,11 +184,19 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
 
   const allColumns = Array.from(new Set([...datasetA.headers, ...datasetB.headers]));
 
-  // Cálculo de métricas de calidad y duplicados por dataset
+  // Cálculo de métricas de calidad y duplicados por dataset evaluando nulos limpios
   const getDatasetMetrics = (dataset: ParsedDataset) => {
     if (dataset.rows.length === 0) return { quality: 0, duplicates: 0, nullRate: 0 };
-    const allCells = dataset.rows.flat();
-    const nullishCells = allCells.filter((cell) => ['', 'null', 'nil', 'none', 'n/a', 'na'].includes(cell.trim().toLowerCase())).length;
+    
+    let nullishCells = 0;
+    dataset.headers.forEach((_, colIndex) => {
+      const sampleValues = dataset.rows.map((r) => r[colIndex] ?? '');
+      const isNumeric = inferTypeFromValues(sampleValues) === 'numérico';
+
+      sampleValues.forEach((val) => {
+        if (isNullValue(val, isNumeric)) nullishCells++;
+      });
+    });
 
     const seenRows = new Set<string>();
     let duplicateRows = 0;
@@ -96,7 +210,7 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
       seenRows.add(rowKey);
     });
 
-    const totalCells = allCells.length || 1;
+    const totalCells = (dataset.rows.length * dataset.headers.length) || 1;
     const nullRate = (nullishCells / totalCells) * 100;
     const duplicatePenalty = (duplicateRows / dataset.rows.length) * 10;
     const quality = Math.max(0, parseFloat((100 - nullRate - duplicatePenalty).toFixed(1)));
@@ -122,22 +236,31 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
       const aColumnValues = inA ? datasetA.rows.map((row) => row[datasetA.headers.indexOf(column)] ?? '') : [];
       const bColumnValues = inB ? datasetB.rows.map((row) => row[datasetB.headers.indexOf(column)] ?? '') : [];
 
-      const numericA = aColumnValues.map((value) => normalizeNumber(value)).filter((value): value is number => value !== null);
-      const numericB = bColumnValues.map((value) => normalizeNumber(value)).filter((value): value is number => value !== null);
-
-      // Exclusión explícita de identificadores, fechas y horas
       const isIgnoredForMedia = /id|identifier|code|codigo|date|fecha|time|hora/i.test(column);
 
       const typeA = inA ? (isIgnoredForMedia ? 'texto/fecha' : inferTypeFromValues(aColumnValues)) : '-';
       const typeB = inB ? (isIgnoredForMedia ? 'texto/fecha' : inferTypeFromValues(bColumnValues)) : '-';
+
+      const isNumericA = typeA === 'numérico';
+      const isNumericB = typeB === 'numérico';
+
+      // Filtrar ceros de imputación para no distorsionar las medias
+      const numericA = aColumnValues
+        .map((value) => normalizeNumber(value))
+        .filter((value): value is number => value !== null && value !== 0);
+
+      const numericB = bColumnValues
+        .map((value) => normalizeNumber(value))
+        .filter((value): value is number => value !== null && value !== 0);
 
       const canComputeMean = !isIgnoredForMedia && typeA !== 'fecha' && typeB !== 'fecha';
 
       const mediaA = numericA.length && canComputeMean ? mean(numericA) : 0;
       const mediaB = numericB.length && canComputeMean ? mean(numericB) : 0;
 
-      const countNullsA = inA ? aColumnValues.filter((value) => ['', 'null', 'nil', 'none', 'n/a', 'na'].includes(value.trim().toLowerCase())).length : 0;
-      const countNullsB = inB ? bColumnValues.filter((value) => ['', 'null', 'nil', 'none', 'n/a', 'na'].includes(value.trim().toLowerCase())).length : 0;
+      // Conteo preciso de nulos (incluyendo N/A y ceros imputados)
+      const countNullsA = inA ? aColumnValues.filter((value) => isNullValue(value, isNumericA)).length : 0;
+      const countNullsB = inB ? bColumnValues.filter((value) => isNullValue(value, isNumericB)).length : 0;
 
       tableRows.push({
         column,
@@ -182,8 +305,8 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
   const salesColIndexB = datasetB.headers.findIndex((h) => /sales|total|income|revenue|ventas/i.test(h));
 
   if (salesColIndexA !== -1 && salesColIndexB !== -1) {
-    const totalA = datasetA.rows.reduce((sum, r) => sum + (normalizeNumber(r[salesColIndexA]) || 0), 0);
-    const totalB = datasetB.rows.reduce((sum, r) => sum + (normalizeNumber(r[salesColIndexB]) || 0), 0);
+    const totalA = processDataset(datasetA.rows, datasetA.headers).totalIngresos;
+    const totalB = processDataset(datasetB.rows, datasetB.headers).totalIngresos;
     const diffSales = totalB - totalA;
     const diffSalesPct = totalA > 0 ? ((diffSales / totalA) * 100).toFixed(1) : '0';
 
@@ -230,52 +353,15 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
   // 6. Duplicados y Nulos
   if (metricsB.duplicates > metricsA.duplicates) {
     insights.push(
-      `**Alerta de duplicados:** Dataset B contiene **${metricsB.duplicates} filas duplicadas** (Dataset A tenía ${metricsA.duplicates}).`
+      `**Alerta de duplicados:** Se registraron **${metricsB.duplicates - metricsA.duplicates} filas duplicadas adicionales** en el Dataset B.`
     );
   }
 
-  const columnsWithMoreNulls = tableRows.filter(
-    (r) => r.state === 'Compartida' && Number(r.nulosB) > Number(r.nulosA)
-  );
-  if (columnsWithMoreNulls.length > 0) {
-    const colNames = columnsWithMoreNulls.map((c) => c.column).join(', ');
-    insights.push(`**Vacíos en aumento:** Se detectó un incremento de nulos en la(s) columna(s): \`${colNames}\`.`);
-  }
-
-  // 7. Inconsistencia de Tipos de Datos
-  const typeMismatches = tableRows.filter(
-    (r) => r.state === 'Compartida' && r.typeA !== '-' && r.typeB !== '-' && r.typeA !== r.typeB
-  );
-  if (typeMismatches.length > 0) {
-    typeMismatches.forEach((m) => {
-      insights.push(
-        `**Incompatibilidad de Tipo:** La columna **"${m.column}"** cambió de tipo **${m.typeA}** (en A) a **${m.typeB}** (en B).`
-      );
-    });
-  }
-
-  // 8. Variación Significativa en Promedios/Medias
-  tableRows
-    .filter((r) => r.state === 'Compartida' && r.mediaA !== '—' && r.mediaB !== '—')
-    .forEach((r) => {
-      const mA = parseFloat(r.mediaA);
-      const mB = parseFloat(r.mediaB);
-      if (mA !== 0) {
-        const diffPct = ((mB - mA) / mA) * 100;
-        if (Math.abs(diffPct) >= 10) {
-          const trend = diffPct > 0 ? 'subió' : 'cayó';
-          insights.push(
-            `**Variación de promedio:** La media de **"${r.column}"** ${trend} un **${Math.abs(diffPct).toFixed(1)}%** (de ${r.mediaA} en A a ${r.mediaB} en B).`
-          );
-        }
-      }
-    });
-
-  // 9. Score de Calidad
+  // 7. Score General de Calidad
   if (qualityDelta !== 0) {
-    const statusText = qualityDelta > 0 ? 'mejoró' : 'empeoró';
+    const qualDirection = qualityDelta > 0 ? 'mejoró' : 'empeoró';
     insights.push(
-      `**Score de Calidad:** La calidad general del archivo ${statusText} **${Math.abs(qualityDelta).toFixed(1)} puntos** (A: ${metricsA.quality}% vs B: ${metricsB.quality}%).`
+      `**Score de Calidad:** La calidad general del dataset **${qualDirection} en ${Math.abs(qualityDelta).toFixed(1)} puntos** (A: ${metricsA.quality}% -> B: ${metricsB.quality}%).`
     );
   }
 

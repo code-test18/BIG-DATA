@@ -4,6 +4,26 @@ export type ParsedDataset = {
   rows: string[][];
 };
 
+export type TopProduct = {
+  producto: string;
+  unidades: number;
+  ingresos: number;
+};
+
+export type DatasetMetrics = {
+  totalIngresos: number;
+  totalUnidades: number;
+  ticketPromedio: number;
+  productosDistintos: number;
+  categories: Record<string, number>;
+  monthly: Record<string, number>;
+  topProducts: TopProduct[];
+  hasDescuentos: boolean;
+  totalDescuentos: number;
+  hasCanalVenta: boolean;
+  canalVentaStats: Record<string, number>;
+};
+
 export type ComparisonRow = {
   column: string;
   state: 'Compartida' | 'Nueva en B' | 'Eliminada en B';
