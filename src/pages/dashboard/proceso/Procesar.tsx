@@ -163,7 +163,7 @@ export default function Procesar() {
                 className={`btn ${activeTab === 'report' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setActiveTab('report')}
               >
-                Generar reporte
+                Analizar 
               </button>
               <button
                 type="button"

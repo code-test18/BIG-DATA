@@ -29,19 +29,11 @@ import {
   YAxis,
 } from 'recharts';
 import type { DashboardContextType } from '../../types/csv';
-import type { MetricasVentas, PuntoParticipacion, VentaReporte } from '../../types/ventas';
-import { eliminarReporte, obtenerReportes } from '../../utils/reportesStorage';
 
-const COLORES_PASTEL = [
-  '#6366f1',
-  '#06b6d4',
-  '#10b981',
-  '#f59e0b',
-  '#ec4899',
-  '#8b5cf6',
-  '#3b82f6',
-  '#14b8a6',
-];
+import type { VentaReporte } from '../../types/ventas';
+import { obtenerReportes } from '../../utils/reportesStorage';
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
 
 export default function Reportes() {
   const { activeFileId } = useOutletContext<DashboardContextType>();
@@ -455,18 +447,10 @@ export default function Reportes() {
                     <Package size={18} color="#10b981" />
                     <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a' }}>Unidades por Categoría</h4>
                   </div>
-                  <div style={{ height: '240px', width: '100%' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={reporteActual.graficoUnidadesPorCategoria} margin={{ top: 5, right: 5, left: -10, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} />
-                        <Tooltip formatter={(value: unknown) => [`${Number(value ?? 0).toLocaleString()} u.`, 'Unidades']} />
-                        <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+
+                  <ReporteGraficos reporte={reporteSeleccionado} />
+                </>
+
               )}
             </div>
 
@@ -484,4 +468,39 @@ export default function Reportes() {
       </div>
     </div>
   );
+}
+
+function ReporteGraficos({ reporte }: { reporte: VentaReporte }) {
+  const comparativa = reporte.graficoComparativoCategoria;
+  const tendencia = reporte.graficoComparativoMes;
+  const tieneComparativa = Boolean(comparativa?.length || tendencia?.length);
+  const tieneGraficosVentas = Boolean(reporte.graficoPorCategoria?.length || reporte.graficoPorFecha?.length || reporte.participacionCategoria?.length);
+
+  if (!tieneComparativa && !tieneGraficosVentas) {
+    return <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #fde68a', borderRadius: '10px', background: '#fffbeb', color: '#92400e' }}>Este reporte no contiene datos gráficos guardados.</div>;
+  }
+
+  const names = reporte.nombresDatasets ?? { a: 'Dataset A', b: 'Dataset B' };
+  return <div style={{ display: 'grid', gap: '1.5rem', marginTop: '1.5rem' }}>
+    <h4 style={{ margin: 0, color: '#0f172a' }}>Gráficos y comparativas</h4>
+    {tendencia?.length ? <div style={chartBox}><h5 style={chartTitle}>Evolución de ingresos</h5><ResponsiveContainer width="100%" height={260}><LineChart data={tendencia}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" /><YAxis /><Tooltip /><Legend /><Line name={names.a} dataKey="datasetA" stroke="#2563eb" strokeWidth={2.5} /><Line name={names.b} dataKey="datasetB" stroke="#d946ef" strokeWidth={2.5} /></LineChart></ResponsiveContainer></div> : null}
+    {comparativa?.length ? <div style={chartBox}><h5 style={chartTitle}>Ingresos por categoría</h5><ResponsiveContainer width="100%" height={260}><BarChart data={comparativa}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" /><YAxis /><Tooltip /><Legend /><Bar name={names.a} dataKey="datasetA" fill="#2563eb" /><Bar name={names.b} dataKey="datasetB" fill="#d946ef" /></BarChart></ResponsiveContainer></div> : null}
+    {reporte.participacionCategoriaA?.length || reporte.participacionCategoriaB?.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}><PieReport title={names.a} data={reporte.participacionCategoriaA ?? []} color="#2563eb" /><PieReport title={names.b} data={reporte.participacionCategoriaB ?? []} color="#d946ef" /></div> : null}
+    {reporte.graficoPorCategoria?.length ? <div style={chartBox}><h5 style={chartTitle}>Gráfico del reporte</h5><ResponsiveContainer width="100%" height={260}><BarChart data={reporte.graficoPorCategoria}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="label" /><YAxis /><Tooltip /><Bar dataKey="total" fill="#2563eb" /></BarChart></ResponsiveContainer></div> : null}
+    {reporte.graficoPorFecha?.length ? <div style={chartBox}><h5 style={chartTitle}>Evolución por fecha</h5><ResponsiveContainer width="100%" height={260}><LineChart data={reporte.graficoPorFecha}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="label" /><YAxis /><Tooltip /><Line dataKey="total" stroke="#2563eb" strokeWidth={2.5} /></LineChart></ResponsiveContainer></div> : null}
+    {reporte.participacionCategoria?.length ? <PieReport title="Participación por categoría" data={reporte.participacionCategoria} color="#2563eb" /> : null}
+    {reporte.productosDatasetA?.length || reporte.productosDatasetB?.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}><ProductReport title={names.a} products={reporte.productosDatasetA ?? []} color="#2563eb" /><ProductReport title={names.b} products={reporte.productosDatasetB ?? []} color="#d946ef" /></div> : null}
+  </div>;
+}
+
+const chartBox = { border: '1px solid #dbe4ef', borderRadius: '10px', background: '#f8fafc', padding: '1rem' };
+const chartTitle = { margin: '0 0 0.75rem', color: '#334155', fontSize: '0.9rem' };
+
+function PieReport({ title, data, color }: { title: string; data: Array<{ categoria: string; porcentaje: number }>; color: string }) {
+  const pieData = data.map((item) => ({ name: item.categoria, value: item.porcentaje }));
+  return <div style={chartBox}><h5 style={{ ...chartTitle, color }}>{title}</h5><ResponsiveContainer width="100%" height={240}><PieChart><Pie data={pieData} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="78%">{pieData.map((item, index) => <Cell key={item.name} fill={`${color}${['', '99', '66', '44', '22'][index % 5]}`} />)}</Pie><Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} /></PieChart></ResponsiveContainer></div>;
+}
+
+function ProductReport({ title, products, color }: { title: string; products: Array<{ producto: string; unidades: number; ingresos: number }>; color: string }) {
+  return <div style={chartBox}><h5 style={{ ...chartTitle, color }}>{title} - productos principales</h5>{products.map((product) => <div key={product.producto} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.45rem 0', borderBottom: '1px solid #e2e8f0', fontSize: '0.8rem' }}><span>{product.producto}</span><strong>{product.ingresos.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</strong></div>)}</div>;
 }

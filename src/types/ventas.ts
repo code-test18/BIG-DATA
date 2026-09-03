@@ -19,6 +19,18 @@ export interface PuntoParticipacion {
   porcentaje: number;
 }
 
+export interface PuntoComparativo {
+  label: string;
+  datasetA: number;
+  datasetB: number;
+}
+
+export interface ProductoReporte {
+  producto: string;
+  unidades: number;
+  ingresos: number;
+}
+
 // Métricas comerciales fijas que se muestran en las tarjetas.
 export interface MetricasVentas {
   ingresoTotal: number;
@@ -45,4 +57,12 @@ export interface VentaReporte {
   graficoPorFecha?: PuntoTotal[];
   graficoUnidadesPorCategoria?: PuntoTotal[];
   participacionCategoria?: PuntoParticipacion[];
+  graficoComparativoCategoria?: PuntoComparativo[];
+  graficoComparativoMes?: PuntoComparativo[];
+  participacionCategoriaA?: PuntoParticipacion[];
+  participacionCategoriaB?: PuntoParticipacion[];
+  productosDatasetA?: ProductoReporte[];
+  productosDatasetB?: ProductoReporte[];
+  nombresDatasets?: { a: string; b: string };
+  insightsComparativos?: string[];
 }
