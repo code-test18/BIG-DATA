@@ -78,8 +78,9 @@ export function inspectCsvRows(rows: string[][]): CsvCleaningSummary {
 
   rows.forEach((row) => {
     row.forEach((cell) => {
-      if (!cell.trim()) emptyValues += 1;
-      if (isNullCell(cell)) nullValues += 1;
+      const trimmed = cell.trim();
+      if (!trimmed) emptyValues += 1;
+      if (isNullCell(trimmed)) nullValues += 1;
     });
     const key = row.join('\u001f');
     if (seen.has(key)) duplicateRows += 1;

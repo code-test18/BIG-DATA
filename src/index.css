@@ -377,7 +377,7 @@ nav {
   margin-bottom: 1.5rem;
 }
 
-.file-selector span {
+.file-selector > span {
   font-size: 0.875rem;
   font-weight: 600;
   color: #64748b;
@@ -393,20 +393,54 @@ nav {
 }
 
 .tab-btn {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  padding: 0.5rem 1rem;
+  background: #334155;
+  border: 1px solid #475569;
+  padding: 0.55rem 0.9rem;
   border-radius: 6px;
   font-size: 0.875rem;
   cursor: pointer;
-  color: #475569;
+  color: #ffffff;
   transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: #1e293b;
+  border-color: #64748b;
 }
 
 .tab-btn.active {
   background: #2563eb;
   color: #ffffff;
   border-color: #2563eb;
+}
+
+.file-tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.file-tab-remove {
+  color: #fecaca;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.file-tab-button.active .file-tab-remove {
+  color: #ffffff;
+}
+
+.file-tab-remove:hover,
+.file-tab-remove:focus-visible {
+  color: #fca5a5;
+  outline: none;
+}
+
+.file-tab-button.active .file-tab-remove:hover,
+.file-tab-button.active .file-tab-remove:focus-visible {
+  color: #ffffff;
 }
 
 /* Tabla con Scroll */
@@ -466,8 +500,16 @@ nav {
 }
 
 .empty-cell {
-  color: #94a3b8;
-  font-style: italic;
+  color: #b91c1c;
+  background-color: #fff1f2;
+  border: 1px solid #fda4af;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-block;
+  font-style: normal;
+  letter-spacing: 0.02em;
 }
 
 .empty-state {
@@ -594,6 +636,7 @@ nav {
 .target-option span { color: #64748b; font-size: 0.82rem; margin-top: 0.45rem; }
 .process-btn { max-width: 320px; }
 .report-cta { width: auto; margin: 0.75rem 0 0 0.75rem; color: #2563eb; }
+.sales-charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 1.5rem; margin-bottom: 1.75rem; }
 .loading-spinner {
   width: 0.9rem;
   height: 0.9rem;
@@ -610,6 +653,22 @@ nav {
 .clean-action-row .form-input { flex: 1; }
 .clean-action-row .btn { width: auto; white-space: nowrap; }
 .btn:disabled { opacity: 0.6; cursor: wait; }
+
+.resend-button {
+  border: 1px solid #2563eb;
+  color: #2563eb;
+}
+
+.resend-button:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.resend-button:not(:disabled):hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
 .eyebrow { color: #2563eb; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; }
 .report-header { justify-content: space-between; border-bottom: 1px solid #dbe4ef; padding-bottom: 1rem; }
 .report-metrics { margin-top: 1rem; }
