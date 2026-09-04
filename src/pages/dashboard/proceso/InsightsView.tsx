@@ -321,6 +321,8 @@ export default function InsightsView({
 
   const datasetA = cleanDatasets.find((item) => item.id === selectedDatasetAId) ?? cleanDatasets[0];
   const datasetB = cleanDatasets.find((item) => item.id === selectedDatasetBId) ?? cleanDatasets[1] ?? cleanDatasets[0];
+  const visibleDatasetAName = datasetA?.name ?? '';
+  const visibleDatasetBName = datasetB?.name ?? '';
 
   useEffect(() => {
     if (datasetA) {
@@ -569,8 +571,8 @@ export default function InsightsView({
                     valB={metric.b}
                     pctA={(metric.aValue / max(key)) * 100}
                     pctB={(metric.bValue / max(key)) * 100}
-                    nameA={datasetAName}
-                    nameB={datasetBName}
+                    nameA={visibleDatasetAName}
+                    nameB={visibleDatasetBName}
                   />
                 );
               })}
@@ -596,8 +598,8 @@ export default function InsightsView({
                 <YAxis tick={{ fontSize: 12, fill: TEXT_SECONDARY }} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(value) => money(Number(value))} contentStyle={{ borderRadius: 10, border: `1px solid ${BORDER}` }} />
                 <Legend wrapperStyle={{ fontSize: '0.8rem' }} />
-                <Area name={datasetAName} type="monotone" dataKey="datasetA" stroke={COLOR_A} strokeWidth={2.5} fill="url(#fillA)" />
-                <Area name={datasetBName} type="monotone" dataKey="datasetB" stroke={COLOR_B} strokeWidth={2.5} fill="url(#fillB)" />
+                <Area name={visibleDatasetAName} type="monotone" dataKey="datasetA" stroke={COLOR_A} strokeWidth={2.5} fill="url(#fillA)" />
+                <Area name={visibleDatasetBName} type="monotone" dataKey="datasetB" stroke={COLOR_B} strokeWidth={2.5} fill="url(#fillB)" />
               </AreaChart>
             </ChartBody>
           </ChartCard>
@@ -612,8 +614,8 @@ export default function InsightsView({
                   <YAxis tick={{ fontSize: 12, fill: TEXT_SECONDARY }} axisLine={false} tickLine={false} />
                   <Tooltip formatter={(value) => money(Number(value))} contentStyle={{ borderRadius: 10, border: `1px solid ${BORDER}` }} />
                   <Legend wrapperStyle={{ fontSize: '0.8rem' }} />
-                  <Bar name={datasetAName} dataKey="datasetA" fill={COLOR_A} radius={[6, 6, 0, 0]} />
-                  <Bar name={datasetBName} dataKey="datasetB" fill={COLOR_B} radius={[6, 6, 0, 0]} />
+                  <Bar name={visibleDatasetAName} dataKey="datasetA" fill={COLOR_A} radius={[6, 6, 0, 0]} />
+                  <Bar name={visibleDatasetBName} dataKey="datasetB" fill={COLOR_B} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ChartBody>
             </ChartCard>
@@ -621,7 +623,7 @@ export default function InsightsView({
             <ChartCard title="Participación por categoría" subtitle="Top 5 categorías de cada dataset">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', height: 240 }}>
                 <div>
-                  <p style={{ margin: '0 0 0.35rem', fontSize: '0.75rem', fontWeight: 700, color: COLOR_A, textAlign: 'center' }}>{datasetAName}</p>
+                  <p style={{ margin: '0 0 0.35rem', fontSize: '0.75rem', fontWeight: 700, color: COLOR_A, textAlign: 'center' }}>{visibleDatasetAName}</p>
                   <ResponsiveContainer width="100%" height="90%">
                     <PieChart>
                       <Pie data={pieDataA} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="80%" paddingAngle={2}>
@@ -634,7 +636,7 @@ export default function InsightsView({
                   </ResponsiveContainer>
                 </div>
                 <div>
-                  <p style={{ margin: '0 0 0.35rem', fontSize: '0.75rem', fontWeight: 700, color: COLOR_B, textAlign: 'center' }}>{datasetBName}</p>
+                  <p style={{ margin: '0 0 0.35rem', fontSize: '0.75rem', fontWeight: 700, color: COLOR_B, textAlign: 'center' }}>{visibleDatasetBName}</p>
                   <ResponsiveContainer width="100%" height="90%">
                     <PieChart>
                       <Pie data={pieDataB} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="80%" paddingAngle={2}>
