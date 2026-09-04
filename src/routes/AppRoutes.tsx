@@ -39,7 +39,7 @@ function AppRoutes() {
 
         {/* Rutas con Sidebar privado */}
         <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<Navigate to="procesar" replace />} />
+          <Route index element={<Navigate to="inicio" replace />} />
           <Route path="inicio" element={<Inicio />} />
           <Route path="procesar" element={<Procesar />} />
           <Route path="ventas" element={<Ventas />} />

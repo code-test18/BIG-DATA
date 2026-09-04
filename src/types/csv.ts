@@ -7,6 +7,8 @@ export interface CsvFile {
   rows: string[][];
   uploadedAt: string;
   isClean: boolean;
+  origen?: 'propio' | 'otro'; // NUEVO — opcional, default se asume 'propio' si no viene
+  sizeKB?: number;            // NUEVO — opcional, peso del archivo en KB
 }
 
 export interface DashboardContextType {

@@ -1,10 +1,16 @@
-import { Upload } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useCsvCleaning } from '../../hooks/useCsvCleaning';
 import { inspectCsvRows } from '../../services/csvCleaningService';
 import type { DashboardContextType } from '../../types/csv';
 import CsvCharts from '../../components/CsvCharts';
+
+function formatSize(sizeKB?: number) {
+  if (!sizeKB) return '—';
+  if (sizeKB < 1024) return `${sizeKB.toFixed(0)} KB`;
+  return `${(sizeKB / 1024).toFixed(2)} MB`;
+}
 
 function LimpiarDatos() {
   const { files, activeFileId, setActiveFileId, addFile, updateFile, removeFile } = useOutletContext<DashboardContextType>();
@@ -33,7 +39,7 @@ function LimpiarDatos() {
     if (!activeFile || activeFile.isClean) return;
     setIsCleaning(true);
     setProgress(0);
-    
+
     const chunkSize = 2000;
     const total = activeFile.rows.length;
     const cleanedRows: string[][] = [];
@@ -41,10 +47,10 @@ function LimpiarDatos() {
     for (let i = 0; i < total; i += chunkSize) {
       const chunk = activeFile.rows.slice(i, i + chunkSize);
       cleanedRows.push(...cleanFile({ ...activeFile, rows: chunk }, fillValue).rows);
-      
+
       const currentProgress = Math.round((Math.min(i + chunkSize, total) / total) * 100);
       setProgress(currentProgress);
-      
+
       // Mantiene el hilo libre para que el DOM muestre la animación
       await new Promise((r) => setTimeout(r, 20));
     }
@@ -89,7 +95,35 @@ function LimpiarDatos() {
       )}
 
       {files.length > 0 ? <>
-        <div className="file-selector"><span>Archivos cargados:</span><div className="file-tabs">{files.map((file) => <button key={file.id} className={`tab-btn file-tab-button ${file.id === activeFileId ? 'active' : ''}`} onClick={(event) => { if ((event.target as HTMLElement).closest('.file-tab-remove')) return; setActiveFileId(file.id); setMessage(null); }}><span>{file.name}{file.isClean ? ' · limpio' : ' · pendiente'}</span><span className="file-tab-remove" role="button" tabIndex={0} aria-label={`Eliminar ${file.name}`} title="Eliminar archivo" onClick={(event) => { event.stopPropagation(); handleRemoveFile(file.id, file.name); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleRemoveFile(file.id, file.name); } }} >x</span></button>)}</div></div>
+        <div className="dataset-card">
+          <span className="file-selector-label">Archivos cargados:</span>
+          <div className="dataset-row-horizontal-list">
+          {files.map((file) => (
+            <button
+              type="button"
+              key={file.id}
+              className={`dataset-row dataset-row-selectable${file.id === activeFileId ? ' dataset-row-active' : ''}`}
+              onClick={() => { setActiveFileId(file.id); setMessage(null); }}
+            >
+              <div>
+                <strong>{file.name}</strong>
+                <span>
+                  {file.rows.length.toLocaleString('en-US')} filas · {file.headers.length} columnas · {formatSize(file.sizeKB)} · {file.isClean ? 'limpio' : 'pendiente'}
+                </span>
+              </div>
+              <div className="dataset-row-actions">
+                {file.isClean ? <CheckCircle2 size={18} className="status-success" /> : <AlertCircle size={18} className="status-warning" />}
+                <Trash2
+                  size={16}
+                  className="dataset-delete-icon"
+                  aria-label={`Eliminar ${file.name}`}
+                  onClick={(e) => { e.stopPropagation(); handleRemoveFile(file.id, file.name); }}
+                />
+              </div>
+            </button>
+          ))}
+          </div>
+        </div>
         {activeFile && <>
           <div className="grid-cards" style={{ marginBottom: '1.5rem' }}>
             <div className="card"><h3>Registros</h3><p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{activeFile.rows.length}</p></div>
@@ -97,7 +131,7 @@ function LimpiarDatos() {
             <div className="card"><h3>Valores nulos</h3><p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{qualitySummary?.nullValues ?? 0}</p></div>
             <div className="card"><h3>Filas duplicadas</h3><p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{qualitySummary?.removedDuplicates ?? 0}</p></div>
           </div>
-          
+
           <div className="card cleaning-actions"><h3>{activeFile.isClean ? 'CSV limpio' : 'Aplicar limpieza'}</h3><p>{activeFile.isClean ? 'Este archivo ya fue limpiado y está disponible para análisis.' : 'El diagnóstico no ha modificado el archivo. Escribe el valor para reemplazar los campos vacíos y confirma la limpieza.'}</p>{!activeFile.isClean && <div className="clean-action-row"><input className="form-input" value={fillValue} onChange={(event) => setFillValue(event.target.value)} placeholder="Valor de reemplazo" /><button className="btn btn-primary" onClick={handleClean}>Limpiar y guardar CSV</button></div>}</div>
           <CsvCharts
             headers={activeFile.headers}
