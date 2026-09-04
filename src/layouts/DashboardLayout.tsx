@@ -17,11 +17,20 @@ function DashboardLayout() {
     setFiles((prev) => prev.map((f) => (f.id === updatedFile.id ? updatedFile : f)));
   };
 
+  const removeFile = (fileId: string) => {
+    setFiles((prev) => prev.filter((file) => file.id !== fileId));
+    setActiveFileId((currentId) => {
+      if (currentId !== fileId) return currentId;
+      return files.find((file) => file.id !== fileId)?.id ?? null;
+    });
+  };
+
   const contextValue: DashboardContextType = {
     files,
     activeFileId,
     addFile,
     updateFile,
+    removeFile,
     setActiveFileId,
     analysisResult,
     setAnalysisResult,

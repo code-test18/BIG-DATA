@@ -1,3 +1,4 @@
+import { Upload } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useCsvCleaning } from '../../hooks/useCsvCleaning';
@@ -6,7 +7,7 @@ import type { DashboardContextType } from '../../types/csv';
 import CsvCharts from '../../components/CsvCharts';
 
 function LimpiarDatos() {
-  const { files, activeFileId, setActiveFileId, addFile, updateFile } = useOutletContext<DashboardContextType>();
+  const { files, activeFileId, setActiveFileId, addFile, updateFile, removeFile } = useOutletContext<DashboardContextType>();
   const [fillValue, setFillValue] = useState('N/A');
   const [message, setMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -53,12 +54,21 @@ function LimpiarDatos() {
     setMessage('CSV limpio y guardado. Ya está disponible en Procesar.');
   };
 
+  const handleRemoveFile = (fileId: string, fileName: string) => {
+    if (!window.confirm(`¿Eliminar el archivo "${fileName}"?`)) return;
+    removeFile(fileId);
+    setMessage('Archivo eliminado.');
+  };
+
   return (
     <div className="dashboard-page">
       <h2>Carga y limpieza</h2>
       <p>Sube un CSV para consultar su calidad antes de aplicar cambios.</p>
       <div className="upload-box">
-        <label htmlFor="clean-csv-input" className="btn btn-primary upload-btn">📂 Subir CSV</label>
+        <label htmlFor="clean-csv-input" className="btn btn-primary upload-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Upload size={16} strokeWidth={2.2} />
+          Subir CSV
+        </label>
         <input id="clean-csv-input" type="file" accept=".csv" onChange={handleUpload} style={{ display: 'none' }} />
       </div>
       {status === 'loading' && <div className="alert-success">Analizando el archivo...</div>}
@@ -79,7 +89,7 @@ function LimpiarDatos() {
       )}
 
       {files.length > 0 ? <>
-        <div className="file-selector"><span>Archivos cargados:</span><div className="file-tabs">{files.map((file) => <button key={file.id} className={`tab-btn ${file.id === activeFileId ? 'active' : ''}`} onClick={() => { setActiveFileId(file.id); setMessage(null); }}>{file.name}{file.isClean ? ' · limpio' : ' · pendiente'}</button>)}</div></div>
+        <div className="file-selector"><span>Archivos cargados:</span><div className="file-tabs">{files.map((file) => <button key={file.id} className={`tab-btn file-tab-button ${file.id === activeFileId ? 'active' : ''}`} onClick={(event) => { if ((event.target as HTMLElement).closest('.file-tab-remove')) return; setActiveFileId(file.id); setMessage(null); }}><span>{file.name}{file.isClean ? ' · limpio' : ' · pendiente'}</span><span className="file-tab-remove" role="button" tabIndex={0} aria-label={`Eliminar ${file.name}`} title="Eliminar archivo" onClick={(event) => { event.stopPropagation(); handleRemoveFile(file.id, file.name); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleRemoveFile(file.id, file.name); } }} >x</span></button>)}</div></div>
         {activeFile && <>
           <div className="grid-cards" style={{ marginBottom: '1.5rem' }}>
             <div className="card"><h3>Registros</h3><p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{activeFile.rows.length}</p></div>
@@ -95,7 +105,7 @@ function LimpiarDatos() {
             summary={qualitySummary!}
           />
 
-          <div className="table-wrapper"><div className="table-header-info"><h3>Vista previa: {activeFile.name}</h3><small>{activeFile.rows.length} filas · {activeFile.isClean ? 'limpias' : 'sin modificar'}</small></div><div className="table-scroll"><table className="data-table"><thead><tr>{activeFile.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{activeFile.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell || <span className="empty-cell">(vacío)</span>}</td>)}</tr>)}</tbody></table></div></div>
+          <div className="table-wrapper"><div className="table-header-info"><h3>Vista previa: {activeFile.name}</h3><small>{activeFile.rows.length} filas · {activeFile.isClean ? 'limpias' : 'sin modificar'}</small></div><div className="table-scroll"><table className="data-table"><thead><tr>{activeFile.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{activeFile.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell.trim() !== '' ? cell : <span className="empty-cell" role="status">[VACÍO]</span>}</td>)}</tr>)}</tbody></table></div></div>
         </>}
       </> : <div className="empty-state"><p>No hay archivos cargados. Sube un CSV para comenzar.</p></div>}
     </div>

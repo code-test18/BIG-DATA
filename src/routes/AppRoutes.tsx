@@ -16,9 +16,11 @@ const Otp = lazy(() => import('../pages/login/Otp'));
 
 // Carga perezosa (Lazy Loading) del Dashboard
 const Inicio = lazy(() => import('../pages/dashboard/Inicio'));
-const Procesar = lazy(() => import('../pages/dashboard/Procesar'));
+const Ventas = lazy(() => import('../pages/dashboard/Ventas'));
+const Procesar = lazy(() => import('../pages/dashboard/proceso/Procesar'));
 const LimpiarDatos = lazy(() => import('../pages/dashboard/LimpiarDatos'));
 const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
+const Inteligencia = lazy(() => import('../pages/dashboard/Inteligencia')); // <--- 1. Importación Lazy agregada
 
 function AppRoutes() {
   return (
@@ -40,9 +42,11 @@ function AppRoutes() {
           <Route index element={<Navigate to="procesar" replace />} />
           <Route path="inicio" element={<Inicio />} />
           <Route path="procesar" element={<Procesar />} />
+          <Route path="ventas" element={<Ventas />} />
           <Route path="limpiar" element={<LimpiarDatos />} />
           <Route path="limpiardatos" element={<LimpiarDatos />} />
           <Route path="reportes" element={<Reportes />} />
+          <Route path="inteligencia" element={<Inteligencia />} /> {/* <--- 2. Nueva ruta agregada */}
         </Route>
       </Routes>
     </Suspense>
