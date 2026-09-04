@@ -125,14 +125,6 @@ export default function Procesar() {
         label: item.label,
         total: item.value,
       })),
-      graficoPorFecha: analysisResult.series.map((item) => ({
-        label: item.label,
-        total: item.value,
-      })),
-      participacionCategoria: analysisResult.series.map((item) => ({
-        categoria: item.label,
-        porcentaje: Number(((item.value / Math.max(analysisResult.series.reduce((sum, current) => sum + current.value, 0), 1)) * 100).toFixed(2)),
-      })),
     };
 
     const savedReports = JSON.parse(localStorage.getItem('reportes_ventas') ?? '[]');
