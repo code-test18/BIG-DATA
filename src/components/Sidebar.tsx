@@ -13,7 +13,7 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h3>BigData Admin</h3>
+        <h3>Mercamax Analysis</h3>
       </div>
       <nav className="sidebar-nav">
         <NavLink to="/dashboard/Inicio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
