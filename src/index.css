@@ -610,72 +610,6 @@ nav {
   margin-bottom: 1.5rem;
 }
 
-.file-selector > span {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #64748b;
-
-  margin-bottom: 0.5rem;
-  display: block;
-}
-
-.file-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tab-btn {
-  background: #334155;
-  border: 1px solid #475569;
-  padding: 0.55rem 0.9rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  color: #ffffff;
-  transition: all 0.2s;
-}
-
-.tab-btn:hover {
-  background: #1e293b;
-  border-color: #64748b;
-}
-
-.tab-btn.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
-}
-
-.file-tab-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-
-.file-tab-remove {
-  color: #fecaca;
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.file-tab-button.active .file-tab-remove {
-  color: #ffffff;
-}
-
-.file-tab-remove:hover,
-.file-tab-remove:focus-visible {
-  color: #fca5a5;
-  outline: none;
-}
-
-.file-tab-button.active .file-tab-remove:hover,
-.file-tab-button.active .file-tab-remove:focus-visible {
-  color: #ffffff;
-}
-
 /* Tabla con Scroll */
 .table-wrapper {
   background: #ffffff;
@@ -918,4 +852,139 @@ nav {
 @media (max-width: 640px) {
   .clean-action-row { align-items: stretch; flex-direction: column; }
   .clean-action-row .btn { width: 100%; }
+}
+
+/* ===== Inicio: botón "+" circular ===== */
+.icon-button-round {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #2563eb;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.icon-button-round:hover {
+  background: #e2e8f0;
+}
+
+.icon-button-round:active {
+  transform: scale(0.94);
+}
+
+/* ===== Inicio: filas de dataset seleccionables ===== */
+.dataset-row-selectable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.dataset-row-selectable:hover {
+  background: #f8fafc;
+}
+
+.dataset-row-active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.dataset-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dataset-delete-icon {
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.dataset-delete-icon:hover {
+  color: #dc2626;
+}
+
+/* ===== Inicio: tabla de estructura ===== */
+.estructura-table-wrapper {
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.estructura-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.estructura-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.estructura-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+.estructura-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.estructura-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.file-selector-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.dataset-row-horizontal-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dataset-row-horizontal-list .dataset-row {
+  width: auto;
+  min-width: 220px;
+  flex: 0 1 auto;
+}
+
+.dataset-row-horizontal-list .dataset-row > div:first-child {
+  min-width: 0;
+}
+
+.dataset-row-horizontal-list .dataset-row strong,
+.dataset-row-horizontal-list .dataset-row span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
