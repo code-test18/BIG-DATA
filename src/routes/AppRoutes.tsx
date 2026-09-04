@@ -13,6 +13,7 @@ const Contact = lazy(() => import('../pages/Contact'));
 const Login = lazy(() => import('../pages/login/Login'));
 const Registro = lazy(() => import('../pages/login/Registro'));
 const Otp = lazy(() => import('../pages/login/Otp'));
+const Admin = lazy(() => import('../pages/admin/Admin'));
 
 // Carga perezosa (Lazy Loading) del Dashboard
 const Inicio = lazy(() => import('../pages/dashboard/Inicio'));
@@ -20,7 +21,8 @@ const Ventas = lazy(() => import('../pages/dashboard/Ventas'));
 const Procesar = lazy(() => import('../pages/dashboard/proceso/Procesar'));
 const LimpiarDatos = lazy(() => import('../pages/dashboard/LimpiarDatos'));
 const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
-const Inteligencia = lazy(() => import('../pages/dashboard/Inteligencia')); // <--- 1. Importación Lazy agregada
+const Inteligencia = lazy(() => import('../pages/dashboard/Inteligencia'));
+const ProjectDetail = lazy(() => import('../pages/dashboard/proyectos/ProjectDetail'));
 
 function AppRoutes() {
   return (
@@ -35,6 +37,7 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
           <Route path="/otp" element={<Otp />} />
+          <Route path="/admin" element={<Admin />} />
         </Route>
 
         {/* Rutas con Sidebar privado */}
@@ -46,7 +49,8 @@ function AppRoutes() {
           <Route path="limpiar" element={<LimpiarDatos />} />
           <Route path="limpiardatos" element={<LimpiarDatos />} />
           <Route path="reportes" element={<Reportes />} />
-          <Route path="inteligencia" element={<Inteligencia />} /> {/* <--- 2. Nueva ruta agregada */}
+          <Route path="inteligencia" element={<Inteligencia />} />
+          <Route path="proyectos/:projectId" element={<ProjectDetail />} />
         </Route>
       </Routes>
     </Suspense>

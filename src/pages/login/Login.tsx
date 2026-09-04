@@ -1,23 +1,12 @@
 import { useState, type SyntheticEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService } from '../../services/authService';
 
-/** Respuesta esperada del endpoint de login. */
-interface LoginResponse {
-  userId?: string;
-  id?: string;
-  token?: string;
-  accessToken?: string;
-  user?: {
-    id?: string;
-    name?: string;
-    email?: string;
-  };
-}
+const STORAGE_KEY = 'bigdata_admin_otps';
+const ADMIN_EMAIL = 'yunsunrojas4@gmail.com';
 
 function Login() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'usuario' | 'admin'>('usuario');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -26,26 +15,70 @@ function Login() {
     e.preventDefault();
     setError(null);
 
-    if (!email.trim() || !email.includes('@')) {
+    if (role === 'admin') {
+      navigate('/admin', { state: { adminEmail: ADMIN_EMAIL } });
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
       setError('Por favor, ingresa un correo electrónico válido.');
       return;
     }
 
-    if (!password.trim()) {
-      setError('Por favor, ingresa tu contraseña.');
+    if (trimmedEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      navigate('/admin', { state: { adminEmail: ADMIN_EMAIL } });
       return;
     }
 
     setLoading(true);
-    try {
-      const result = (await authService.login({
-        email: email.trim(),
-        password,
-      })) as LoginResponse;
 
-      const userId = result?.userId ?? result?.user?.id ?? result?.id;
-      if (!userId) throw new Error('No se recibió el identificador del usuario.');
-      navigate('/otp', { state: { userId } });
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const records = stored
+        ? (JSON.parse(stored) as Array<{
+            email: string;
+            code: string;
+            userId: string;
+            createdAt: number;
+            approved?: boolean;
+            status?: string;
+          }>)
+        : [];
+
+      let match = records.find(
+        (item) => item.email.toLowerCase() === trimmedEmail.toLowerCase()
+      );
+
+      // Si no existe, se crea la solicitud OTP para que le llegue/lo apruebe el admin
+      if (!match) {
+        const newCode = String(Math.floor(100000 + Math.random() * 900000));
+        const newUserId = crypto.randomUUID();
+        match = {
+          userId: newUserId,
+          email: trimmedEmail,
+          code: newCode,
+          createdAt: Date.now(),
+          approved: false,
+          status: 'pendiente',
+        };
+
+        const nextRecords = [match, ...records];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
+      } else {
+        // Opcional: si ya existe, genera un nuevo código OTP actualizado para este intento
+        const newCode = String(Math.floor(100000 + Math.random() * 900000));
+        match.code = newCode;
+        match.createdAt = Date.now();
+        
+        const updatedRecords = records.map((rec) =>
+          rec.userId === match?.userId ? match : rec
+        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRecords));
+      }
+
+      // Redirige directamente a la vista del OTP pasando el ID y correo
+      navigate('/otp', { state: { userId: match.userId, email: match.email } });
     } catch (err) {
       setError(
         err instanceof Error
@@ -60,46 +93,49 @@ function Login() {
   return (
     <section className="page auth-container">
       <div className="auth-card">
-        <h2>Iniciar Sesión</h2>
-        <p className="auth-subtitle">Ingresa tus credenciales para acceder.</p>
+        <h2>Acceder</h2>
+        <p className="auth-subtitle">
+          Ingresa tu correo para solicitar el código OTP al administrador.
+        </p>
 
         {error && <div className="alert-error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              Correo Electrónico
+            <label htmlFor="role" className="form-label">
+              Entrar como
             </label>
-            <input
-              type="email"
-              id="email"
+            <select
+              id="role"
               className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ejemplo@correo.com"
-              autoComplete="email"
-              required
-            />
+              value={role}
+              onChange={(e) => setRole(e.target.value as 'usuario' | 'admin')}
+            >
+              <option value="usuario">Usuario</option>
+              <option value="admin">Administrador</option>
+            </select>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Contraseña
-            </label>
-            <input
-              type="password"
-              id="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Tu contraseña"
-              autoComplete="current-password"
-              required
-            />
-          </div>
+          {role === 'usuario' && (
+            <div className="form-group">
+              <label htmlFor="email" className="form-label">
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                id="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ejemplo@correo.com"
+                autoComplete="email"
+                required
+              />
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            {loading ? 'Procesando...' : role === 'admin' ? 'Entrar como admin' : 'Iniciar sesión'}
           </button>
         </form>
 

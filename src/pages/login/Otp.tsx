@@ -1,27 +1,25 @@
 import { useState, useEffect, useRef, type SyntheticEvent, type KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { authService } from '../../services/authService';
 
 const RESEND_AVAILABLE_AT_KEY = 'otp_resend_available_at';
 const OTP_VALIDITY_SECONDS = 60;
 const RESEND_COOLDOWN_SECONDS = 180;
+const STORAGE_KEY = 'bigdata_admin_otps';
 
 export default function Otp() {
-  // --- ESTADOS ---
-  const [otp, setOtp] = useState<string[]>(Array(6).fill('')); // Arreglo para los 6 dígitos del OTP
-  const [error, setError] = useState<string | null>(null);     // Mensaje de error para la alerta
-  const [loading, setLoading] = useState(false);               // Estado de carga para deshabilitar botones
-  const [timeLeft, setTimeLeft] = useState(OTP_VALIDITY_SECONDS); // Tiempo de validez del código (1 minuto)
+  const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(OTP_VALIDITY_SECONDS);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null); // Mensaje de éxito/información
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  // Referencia para manipular el foco táctil de cada input dinámicamente
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
   const { state } = useLocation();
   const navigate = useNavigate();
   const userId = state?.userId as string | undefined;
+  const email = (state?.email as string | undefined) ?? '';
 
-  // --- TEMPORIZADOR GLOBAL (REVERSA / CUENTA REGRESIVA) ---
   useEffect(() => {
     const availableAt = Number(localStorage.getItem(RESEND_AVAILABLE_AT_KEY));
     if (!availableAt || availableAt <= Date.now()) {
@@ -38,7 +36,6 @@ export default function Otp() {
     return () => clearInterval(timer);
   }, []);
 
-  // Convierte segundos a formato "X min Ys" o "MM:SS"
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
@@ -46,7 +43,6 @@ export default function Otp() {
     return `${m} min ${sec < 10 ? '0' : ''}${sec}s`;
   };
 
-  // --- MANEJO DE TECLADO Y CASILLAS ---
   const handleChange = (v: string, i: number) => {
     if (!/^\d*$/.test(v)) return;
     const n = [...otp]; n[i] = v.slice(-1); setOtp(n);
@@ -57,28 +53,45 @@ export default function Otp() {
     if (e.key === 'Backspace' && !otp[i] && i > 0) inputsRef.current[i - 1]?.focus();
   };
 
-  // --- ACCIONES CON BACKEND ---
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
-    if (!userId) return setError('No se encontró el usuario.');
+    if (!userId || !email) return setError('No se encontró la información del usuario.');
+
+    const enteredCode = otp.join('');
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const codes = stored ? JSON.parse(stored) as Array<{ email: string; code: string; userId: string; createdAt: number; approved?: boolean }> : [];
+    const match = codes.find((item) => item.userId === userId && item.email.toLowerCase() === email.toLowerCase());
+
+    if (!match) {
+      setError('No existe un código OTP activo para este usuario. Regresa e intenta nuevamente.');
+      return;
+    }
+
+    if (match.code !== enteredCode) {
+      setError('El código OTP ingresado es incorrecto.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setInfoMessage(null);
-    
+
     try {
-      const res = await authService.verifyOtp({ userId, code: otp.join('') }) as { token?: string; accessToken?: string };
-      const token = res?.token ?? res?.accessToken;
-      if (!token) throw new Error('Token no recibido.');
-      
-      localStorage.setItem('auth_token', token);
+      // Marcar registro como aprobado al validar el código OTP correcto
+      const updatedCodes = codes.map((item) => 
+        item.userId === userId ? { ...item, approved: true, status: 'aprobado' } : item
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCodes));
+
+      localStorage.setItem('auth_token', 'local-admin-otp-token');
       navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al verificar.');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResend = async () => {
-    if (!userId || loading || cooldown > 0) return;
+    if (!userId || !email || loading || cooldown > 0) return;
 
     const availableAt = Number(localStorage.getItem(RESEND_AVAILABLE_AT_KEY));
     if (availableAt > Date.now()) {
@@ -91,24 +104,25 @@ export default function Otp() {
     setInfoMessage(null);
 
     try {
-      await authService.resendOtp({ userId });
-      setCooldown(RESEND_COOLDOWN_SECONDS);  // Bloquea el botón por 3 minutos
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const codes = stored ? JSON.parse(stored) as Array<{ email: string; code: string; userId: string; createdAt: number; approved?: boolean }> : [];
+
+      const newCode = String(Math.floor(100000 + Math.random() * 900000));
+      const nextCodes = codes.map((item) => 
+        item.userId === userId && item.email.toLowerCase() === email.toLowerCase() 
+          ? { ...item, code: newCode, createdAt: Date.now(), approved: false, status: 'pendiente' } 
+          : item
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextCodes));
+
+      setCooldown(RESEND_COOLDOWN_SECONDS);
       localStorage.setItem(RESEND_AVAILABLE_AT_KEY, String(Date.now() + RESEND_COOLDOWN_SECONDS * 1000));
-      setTimeLeft(OTP_VALIDITY_SECONDS);  // Reinicia el minuto de validez del OTP
+      setTimeLeft(OTP_VALIDITY_SECONDS);
       setOtp(Array(6).fill(''));
-      setInfoMessage('Nuevo código enviado a tu correo.');
+      setInfoMessage('Se solicitó un nuevo código al administrador.');
       inputsRef.current[0]?.focus();
     } catch (err) {
-      let msg = err instanceof Error ? err.message : 'Error al reenviar.';
-      
-      const match = msg.match(/(\d+)\s*segundos/i);
-      if (match && match[1]) {
-        const cappedSeconds = Math.min(parseInt(match[1], 10), RESEND_COOLDOWN_SECONDS);
-        setCooldown(cappedSeconds); // Se activa el contador dinámico de reversa
-        setError(null);
-      } else {
-        setError(msg);
-      }
+      setError(err instanceof Error ? err.message : 'Error al solicitar nuevo código.');
     } finally {
       setLoading(false);
     }
@@ -117,15 +131,15 @@ export default function Otp() {
   return (
     <section className="page auth-container">
       <div className="auth-card">
-        <h2>Verificar código</h2>
-        <p className="auth-subtitle">Ingresa el código OTP enviado a tu correo.</p>
+        <h2>Verificar código OTP</h2>
+        <p className="auth-subtitle">
+          Ingresa el código OTP de 6 dígitos que te proporcionará el administrador.
+        </p>
 
-        {/* Alertas */}
         {error && <div className="alert-error">{error}</div>}
         {infoMessage && <div className="alert-success" style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', fontSize: '0.85rem', borderRadius: '8px' }}>{infoMessage}</div>}
 
         <form onSubmit={handleSubmit}>
-          {/* Casillas de OTP */}
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '20px 0' }}>
             {otp.map((digit, idx) => (
               <input
@@ -141,14 +155,12 @@ export default function Otp() {
             ))}
           </div>
 
-          {/* Único indicador de validez del código */}
           <div style={{ textAlign: 'center', fontSize: '13px', marginBottom: '15px', color: '#64748b' }}>
             <p>Tiempo de validez: <strong style={{ color: timeLeft < 30 ? '#dc2626' : '#0f172a' }}>{formatTime(timeLeft)}</strong></p>
           </div>
 
-          {/* Botón principal */}
           <button type="submit" className="btn btn-primary" disabled={loading || otp.some((d) => !d)}>
-            {loading ? 'Verificando...' : 'Verificar código'}
+            {loading ? 'Verificando...' : 'Verificar e ingresar'}
           </button>
         </form>
 
@@ -160,7 +172,7 @@ export default function Otp() {
           aria-live="polite"
           style={{ marginTop: '10px', width: '100%', opacity: loading || cooldown > 0 ? 0.65 : 1 }}
         >
-          {cooldown > 0 ? `Reenviar código en: ${formatTime(cooldown)}` : 'Reenviar código'}
+          {cooldown > 0 ? `Solicitar nuevo código en: ${formatTime(cooldown)}` : 'Solicitar nuevo código'}
         </button>
       </div>
     </section>
