@@ -52,3 +52,26 @@ export type DatasetComparison = {
   insights: string[];
   tableRows: ComparisonRow[];
 };
+export type BusinessConcept = 'ingreso' | 'unidades' | 'producto' | 'categoria' | 'fecha' | 'descuento' | 'canal';
+
+export type ColumnMapping = Record<BusinessConcept, string | null>;
+
+export const EMPTY_MAPPING: ColumnMapping = {
+  ingreso: null,
+  unidades: null,
+  producto: null,
+  categoria: null,
+  fecha: null,
+  descuento: null,
+  canal: null,
+};
+
+export type InsightLevel = 'critico' | 'advertencia' | 'correcto';
+
+export interface Insight {
+  id: string;
+  nivel: InsightLevel;
+  titulo: string;
+  mensaje: string;
+  origen: 'motor' | 'ia';
+}
