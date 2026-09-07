@@ -9,6 +9,8 @@ export interface CsvFile {
   isClean: boolean;
   origen?: 'propio' | 'otro'; // NUEVO — opcional, default se asume 'propio' si no viene
   sizeKB?: number;            // NUEVO — opcional, peso del archivo en KB
+  urlArchivo?: string;        // NUEVO — URL en Cloudinary una vez persistido en el backend
+  synced?: boolean;           // NUEVO — true si ya existe en el backend (id = id real del backend)
 }
 
 export interface DashboardContextType {
@@ -20,4 +22,6 @@ export interface DashboardContextType {
   setActiveFileId: (id: string) => void;
   analysisResult: AnalysisResult | null;
   setAnalysisResult: (result: AnalysisResult | null) => void;
+  loadingFiles: boolean;
+  loadError: string | null;
 }

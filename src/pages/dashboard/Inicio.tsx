@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
+import { eliminarCsv } from '../../services/csvService';
 import type { CsvFile, DashboardContextType } from '../../types/csv';
 
 const COLORS = ['#2563eb', '#0f766e', '#d97706', '#dc2626', '#0891b2', '#7c3aed'];
@@ -85,7 +86,7 @@ function formatSize(sizeKB?: number) {
 }
 
 function Inicio() {
-  const { files, removeFile } = useOutletContext<DashboardContextType>();
+  const { files, removeFile, loadingFiles, loadError } = useOutletContext<DashboardContextType>();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(files[0]?.id ?? null);
 
   const selectedFile = useMemo(
@@ -121,6 +122,9 @@ function Inicio() {
         </div>
         <div className="dashboard-date">Actualizado hoy</div>
       </div>
+
+      {loadingFiles && <div className="alert-success">Cargando tus CSVs guardados...</div>}
+      {loadError && <div className="alert-error">{loadError}</div>}
 
       <div className="dashboard-kpis">
         <MetricCard icon={Database} label="Datasets cargados" value={files.length.toString()} accent />
@@ -179,11 +183,16 @@ function Inicio() {
                   size={16}
                   className="dataset-delete-icon"
                   aria-label={`Eliminar ${file.name}`}
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
                     if (!window.confirm(`¿Eliminar el archivo "${file.name}"?`)) return;
-                    removeFile(file.id);
-                    if (selectedFile?.id === file.id) setSelectedFileId(null);
+                    try {
+                      await eliminarCsv(file.id);
+                      removeFile(file.id);
+                      if (selectedFile?.id === file.id) setSelectedFileId(null);
+                    } catch (err) {
+                      window.alert(err instanceof Error ? err.message : 'No se pudo eliminar el archivo en el servidor.');
+                    }
                   }}
                 />
               </div>

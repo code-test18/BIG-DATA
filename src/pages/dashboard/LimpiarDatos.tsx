@@ -2,7 +2,8 @@ import { Upload, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useCsvCleaning } from '../../hooks/useCsvCleaning';
-import { inspectCsvRows } from '../../services/csvCleaningService';
+import { buildCsvFile, inspectCsvRows } from '../../services/csvCleaningService';
+import { eliminarCsv, marcarComoLimpio, subirCsv } from '../../services/csvService';
 import type { DashboardContextType } from '../../types/csv';
 import CsvCharts from '../../components/CsvCharts';
 
@@ -16,8 +17,10 @@ function LimpiarDatos() {
   const { files, activeFileId, setActiveFileId, addFile, updateFile, removeFile } = useOutletContext<DashboardContextType>();
   const [fillValue, setFillValue] = useState('N/A');
   const [message, setMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { inspectFile, cleanFile, status, error } = useCsvCleaning();
   const activeFile = files.find((file) => file.id === activeFileId);
@@ -27,18 +30,44 @@ function LimpiarDatos() {
     const file = event.target.files?.[0];
     if (!file) return;
     setMessage(null);
+    setErrorMsg(null);
+
+    // 1) Parseamos localmente para poder mostrar diagnóstico/tabla al instante.
     const inspectedFile = await inspectFile(file);
-    if (inspectedFile) {
-      addFile(inspectedFile);
-      setMessage('Diagnóstico listo. Revisa los datos y pulsa "Limpiar y guardar CSV" para continuar.');
+    if (!inspectedFile) {
+      event.target.value = '';
+      return;
     }
-    event.target.value = '';
+
+    // 2) Persistimos en el backend (POST /csv, multipart/form-data).
+    setIsUploading(true);
+    try {
+      const { csv } = await subirCsv(file, {
+        filasCount: inspectedFile.rows.length,
+        columnCount: inspectedFile.headers.length,
+      });
+
+      addFile({
+        ...inspectedFile,
+        id: csv.id, // usamos el id real del backend para futuros PUT/DELETE
+        urlArchivo: csv.urlArchivo,
+        sizeKB: csv.tamanioBytes / 1024,
+        synced: true,
+      });
+      setMessage('CSV guardado en el servidor. Revisa los datos y pulsa "Limpiar y guardar CSV" para continuar.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'No se pudo guardar el CSV en el servidor.');
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
+    }
   };
 
   const handleClean = async () => {
     if (!activeFile || activeFile.isClean) return;
     setIsCleaning(true);
     setProgress(0);
+    setErrorMsg(null);
 
     const chunkSize = 2000;
     const total = activeFile.rows.length;
@@ -55,15 +84,42 @@ function LimpiarDatos() {
       await new Promise((r) => setTimeout(r, 20));
     }
 
-    updateFile({ ...activeFile, rows: cleanedRows, isClean: true });
-    setIsCleaning(false);
-    setMessage('CSV limpio y guardado. Ya está disponible en Procesar.');
+    try {
+      // Reconstruimos un File real con las filas ya limpias y lo mandamos
+      // a PUT /csv/:id/limpiar (multipart/form-data, sin campo "tipo").
+      const cleanedFile = buildCsvFile(activeFile.name, activeFile.headers, cleanedRows);
+      const { csv } = await marcarComoLimpio(activeFile.id, cleanedFile, {
+        filasCount: cleanedRows.length,
+        columnCount: activeFile.headers.length,
+      });
+
+      // Importante: la urlArchivo puede cambiar (Cloudinary invalida caché),
+      // así que actualizamos el estado local con lo que venga en la respuesta.
+      updateFile({
+        ...activeFile,
+        rows: cleanedRows,
+        isClean: true,
+        urlArchivo: csv.urlArchivo,
+        sizeKB: csv.tamanioBytes / 1024,
+      });
+      setMessage('CSV limpio y guardado en el servidor. Ya está disponible en Procesar.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'No se pudo guardar el CSV limpio en el servidor.');
+    } finally {
+      setIsCleaning(false);
+    }
   };
 
-  const handleRemoveFile = (fileId: string, fileName: string) => {
+  const handleRemoveFile = async (fileId: string, fileName: string) => {
     if (!window.confirm(`¿Eliminar el archivo "${fileName}"?`)) return;
-    removeFile(fileId);
-    setMessage('Archivo eliminado.');
+    setErrorMsg(null);
+    try {
+      await eliminarCsv(fileId);
+      removeFile(fileId);
+      setMessage('Archivo eliminado.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'No se pudo eliminar el archivo en el servidor.');
+    }
   };
 
   return (
@@ -77,8 +133,8 @@ function LimpiarDatos() {
         </label>
         <input id="clean-csv-input" type="file" accept=".csv" onChange={handleUpload} style={{ display: 'none' }} />
       </div>
-      {status === 'loading' && <div className="alert-success">Analizando el archivo...</div>}
-      {error && <div className="alert-error">{error}</div>}
+      {(status === 'loading' || isUploading) && <div className="alert-success">{isUploading ? 'Guardando CSV en el servidor...' : 'Analizando el archivo...'}</div>}
+      {(error || errorMsg) && <div className="alert-error">{error ?? errorMsg}</div>}
       {message && <div className="alert-success">{message}</div>}
 
       {/* Barra de progreso real en tiempo real */}
@@ -132,7 +188,7 @@ function LimpiarDatos() {
             <div className="card"><h3>Filas duplicadas</h3><p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{qualitySummary?.removedDuplicates ?? 0}</p></div>
           </div>
 
-          <div className="card cleaning-actions"><h3>{activeFile.isClean ? 'CSV limpio' : 'Aplicar limpieza'}</h3><p>{activeFile.isClean ? 'Este archivo ya fue limpiado y está disponible para análisis.' : 'El diagnóstico no ha modificado el archivo. Escribe el valor para reemplazar los campos vacíos y confirma la limpieza.'}</p>{!activeFile.isClean && <div className="clean-action-row"><input className="form-input" value={fillValue} onChange={(event) => setFillValue(event.target.value)} placeholder="Valor de reemplazo" /><button className="btn btn-primary" onClick={handleClean}>Limpiar y guardar CSV</button></div>}</div>
+          <div className="card cleaning-actions"><h3>{activeFile.isClean ? 'CSV limpio' : 'Aplicar limpieza'}</h3><p>{activeFile.isClean ? 'Este archivo ya fue limpiado y está disponible para análisis.' : 'El diagnóstico no ha modificado el archivo. Escribe el valor para reemplazar los campos vacíos y confirma la limpieza.'}</p>{!activeFile.isClean && <div className="clean-action-row"><input className="form-input" value={fillValue} onChange={(event) => setFillValue(event.target.value)} placeholder="Valor de reemplazo" /><button className="btn btn-primary" onClick={handleClean} disabled={isCleaning}>{isCleaning ? 'Guardando...' : 'Limpiar y guardar CSV'}</button></div>}</div>
           <CsvCharts
             headers={activeFile.headers}
             rows={activeFile.rows}

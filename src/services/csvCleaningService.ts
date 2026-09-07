@@ -90,6 +90,12 @@ export function inspectCsvRows(rows: string[][]): CsvCleaningSummary {
   return { removedDuplicates: duplicateRows, formattedValues: 0, filledNulls: 0, emptyValues, nullValues };
 }
 
+/** Reconstruye un File CSV real a partir de headers+rows ya parseados/limpiados en el navegador. */
+export function buildCsvFile(name: string, headers: string[], rows: string[][]): File {
+  const csvText = Papa.unparse({ fields: headers, data: rows });
+  return new File([csvText], name, { type: 'text/csv' });
+}
+
 export function createCsvFile(name: string, parsed: ParsedCsv, rows: string[][], isClean = false): CsvFile {
   return {
     id: crypto.randomUUID(),
