@@ -7,7 +7,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Cell,
@@ -16,12 +16,14 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { eliminarCsv } from '../../services/csvService';
+import { useCsvCleaning } from '../../hooks/useCsvCleaning';
+import { eliminarCsv, subirCsv } from '../../services/csvService';
 import type { CsvFile, DashboardContextType } from '../../types/csv';
 
 const COLORS = ['#2563eb', '#0f766e', '#d97706', '#dc2626', '#0891b2', '#7c3aed'];
 
 type TipoDato = 'Número' | 'Texto' | 'Fecha';
+type Origen = 'propio' | 'otro';
 
 interface ColumnaEstructura {
   columna: string;
@@ -86,8 +88,16 @@ function formatSize(sizeKB?: number) {
 }
 
 function Inicio() {
-  const { files, removeFile, loadingFiles, loadError } = useOutletContext<DashboardContextType>();
+  const { files, addFile, removeFile, loadingFiles, loadError } = useOutletContext<DashboardContextType>();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(files[0]?.id ?? null);
+
+  const [showOriginPicker, setShowOriginPicker] = useState(false);
+  const [pendingOrigin, setPendingOrigin] = useState<Origen | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { inspectFile } = useCsvCleaning();
 
   const selectedFile = useMemo(
     () => files.find((f) => f.id === selectedFileId) ?? files[0] ?? null,
@@ -112,6 +122,54 @@ function Inicio() {
       .map(([tipo, count]) => ({ tipo, count }));
   }, [estructura]);
 
+  // Abre el picker de origen; el archivo se elige después de confirmar de dónde viene
+  const handleOpenUpload = () => {
+    setUploadError(null);
+    setShowOriginPicker(true);
+  };
+
+  const handlePickOrigin = (origen: Origen) => {
+    setPendingOrigin(origen);
+    setShowOriginPicker(false);
+    setTimeout(() => fileInputRef.current?.click(), 0);
+  };
+
+  const handleFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !pendingOrigin) return;
+
+    setUploadError(null);
+    const inspectedFile = await inspectFile(file);
+    if (!inspectedFile) {
+      setPendingOrigin(null);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { csv } = await subirCsv(file, {
+        filasCount: inspectedFile.rows.length,
+        columnCount: inspectedFile.headers.length,
+        tipo: pendingOrigin === 'propio' ? 'PROPIO' : 'OTRO',
+      });
+
+      addFile({
+        ...inspectedFile,
+        id: csv.id,
+        urlArchivo: csv.urlArchivo,
+        sizeKB: csv.tamanioBytes / 1024,
+        synced: true,
+        origen: pendingOrigin,
+      });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'No se pudo guardar el CSV en el servidor.');
+    } finally {
+      setIsUploading(false);
+      setPendingOrigin(null);
+    }
+  };
+
   return (
     <div className="dashboard-page home-dashboard">
       <div className="dashboard-heading">
@@ -125,6 +183,36 @@ function Inicio() {
 
       {loadingFiles && <div className="alert-success">Cargando tus CSVs guardados...</div>}
       {loadError && <div className="alert-error">{loadError}</div>}
+      {isUploading && <div className="alert-success">Subiendo CSV...</div>}
+      {uploadError && <div className="alert-error">{uploadError}</div>}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        onChange={handleFileSelected}
+        style={{ display: 'none' }}
+      />
+
+      {showOriginPicker && (
+        <div className="modal-overlay" onClick={() => setShowOriginPicker(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>¿De dónde es este CSV?</h3>
+            <p>Elige el origen antes de seleccionar el archivo.</p>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-primary" onClick={() => handlePickOrigin('propio')}>
+                CSV propio
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => handlePickOrigin('otro')}>
+                CSV de la competencia
+              </button>
+            </div>
+            <button type="button" className="modal-close" onClick={() => setShowOriginPicker(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="dashboard-kpis">
         <MetricCard icon={Database} label="Datasets cargados" value={files.length.toString()} accent />
@@ -160,7 +248,7 @@ function Inicio() {
               <h3>Datasets</h3>
               <p>Selecciona uno para ver su detalle.</p>
             </div>
-            <button type="button" className="icon-button-round" aria-label="Agregar CSV" title="Agregar CSV (próximamente)">
+            <button type="button" className="icon-button-round" aria-label="Agregar CSV" title="Agregar CSV" onClick={handleOpenUpload}>
               <Plus size={16} />
             </button>
           </div>

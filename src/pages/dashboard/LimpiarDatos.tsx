@@ -1,9 +1,9 @@
-import { Upload, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
-import { useState, type ChangeEvent } from 'react';
+import { CheckCircle2, AlertCircle, Search, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useCsvCleaning } from '../../hooks/useCsvCleaning';
 import { buildCsvFile, inspectCsvRows } from '../../services/csvCleaningService';
-import { eliminarCsv, marcarComoLimpio, subirCsv } from '../../services/csvService';
+import { eliminarCsv, marcarComoLimpio } from '../../services/csvService';
 import type { DashboardContextType } from '../../types/csv';
 import CsvCharts from '../../components/CsvCharts';
 
@@ -14,54 +14,24 @@ function formatSize(sizeKB?: number) {
 }
 
 function LimpiarDatos() {
-  const { files, activeFileId, setActiveFileId, addFile, updateFile, removeFile } = useOutletContext<DashboardContextType>();
+  const { files, activeFileId, setActiveFileId, updateFile, removeFile } = useOutletContext<DashboardContextType>();
   const [fillValue, setFillValue] = useState('N/A');
+  const [searchTerm, setSearchTerm] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isCleaning, setIsCleaning] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
 
-  const { inspectFile, cleanFile, status, error } = useCsvCleaning();
+  const { cleanFile, error } = useCsvCleaning();
   const activeFile = files.find((file) => file.id === activeFileId);
   const qualitySummary = activeFile ? inspectCsvRows(activeFile.rows) : null;
 
-  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setMessage(null);
-    setErrorMsg(null);
-
-    // 1) Parseamos localmente para poder mostrar diagnóstico/tabla al instante.
-    const inspectedFile = await inspectFile(file);
-    if (!inspectedFile) {
-      event.target.value = '';
-      return;
-    }
-
-    // 2) Persistimos en el backend (POST /csv, multipart/form-data).
-    setIsUploading(true);
-    try {
-      const { csv } = await subirCsv(file, {
-        filasCount: inspectedFile.rows.length,
-        columnCount: inspectedFile.headers.length,
-      });
-
-      addFile({
-        ...inspectedFile,
-        id: csv.id, // usamos el id real del backend para futuros PUT/DELETE
-        urlArchivo: csv.urlArchivo,
-        sizeKB: csv.tamanioBytes / 1024,
-        synced: true,
-      });
-      setMessage('CSV guardado en el servidor. Revisa los datos y pulsa "Limpiar y guardar CSV" para continuar.');
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'No se pudo guardar el CSV en el servidor.');
-    } finally {
-      setIsUploading(false);
-      event.target.value = '';
-    }
-  };
+  const filteredRows = useMemo(() => {
+    if (!activeFile) return [];
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return activeFile.rows;
+    return activeFile.rows.filter((row) => row.some((cell) => cell.toLowerCase().includes(term)));
+  }, [activeFile, searchTerm]);
 
   const handleClean = async () => {
     if (!activeFile || activeFile.isClean) return;
@@ -125,16 +95,10 @@ function LimpiarDatos() {
   return (
     <div className="dashboard-page">
       <h2>Carga y limpieza</h2>
-      <p>Sube un CSV para consultar su calidad antes de aplicar cambios.</p>
-      <div className="upload-box">
-        <label htmlFor="clean-csv-input" className="btn btn-primary upload-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Upload size={16} strokeWidth={2.2} />
-          Subir CSV
-        </label>
-        <input id="clean-csv-input" type="file" accept=".csv" onChange={handleUpload} style={{ display: 'none' }} />
-      </div>
-      {(status === 'loading' || isUploading) && <div className="alert-success">{isUploading ? 'Guardando CSV en el servidor...' : 'Analizando el archivo...'}</div>}
-      {(error || errorMsg) && <div className="alert-error">{error ?? errorMsg}</div>}
+      <p>Selecciona un dataset para revisar su calidad y aplicar la limpieza.</p>
+
+      {error && <div className="alert-error">{error}</div>}
+      {errorMsg && <div className="alert-error">{errorMsg}</div>}
       {message && <div className="alert-success">{message}</div>}
 
       {/* Barra de progreso real en tiempo real */}
@@ -195,9 +159,38 @@ function LimpiarDatos() {
             summary={qualitySummary!}
           />
 
-          <div className="table-wrapper"><div className="table-header-info"><h3>Vista previa: {activeFile.name}</h3><small>{activeFile.rows.length} filas · {activeFile.isClean ? 'limpias' : 'sin modificar'}</small></div><div className="table-scroll"><table className="data-table"><thead><tr>{activeFile.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{activeFile.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell.trim() !== '' ? cell : <span className="empty-cell" role="status">[VACÍO]</span>}</td>)}</tr>)}</tbody></table></div></div>
+          <div className="table-wrapper">
+            <div className="table-header-info">
+              <h3>Vista previa: {activeFile.name}</h3>
+              <small>{filteredRows.length} de {activeFile.rows.length} filas · {activeFile.isClean ? 'limpias' : 'sin modificar'}</small>
+            </div>
+            <div className="table-search-row">
+              <Search size={16} />
+              <input
+                type="text"
+                className="table-search-input"
+                placeholder="Buscar en las filas..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead><tr>{activeFile.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead>
+                <tbody>
+                  {filteredRows.slice(0, 50).map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={cellIndex}>{cell.trim() !== '' ? cell : <span className="empty-cell" role="status">[VACÍO]</span>}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>}
-      </> : <div className="empty-state"><p>No hay archivos cargados. Sube un CSV para comenzar.</p></div>}
+      </> : <div className="empty-state"><p>No hay archivos cargados. Sube uno desde Inicio para comenzar.</p></div>}
     </div>
   );
 }
