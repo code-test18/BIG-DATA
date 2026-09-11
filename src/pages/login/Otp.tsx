@@ -70,7 +70,7 @@ export default function Otp() {
       const token = res?.token ?? res?.accessToken;
       if (!token) throw new Error('Token no recibido.');
       
-      localStorage.setItem('auth_token', token);
+      sessionStorage.setItem('auth_token', token);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al verificar.');

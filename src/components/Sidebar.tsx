@@ -2,56 +2,53 @@ import {
   ArrowLeft,
   BarChart3,
   BrainCircuit,
+  ClipboardList,
   FileSpreadsheet,
   Home,
   TrendingUp,
   Upload,
+  Users,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { getCurrentUser } from '../utils/auth';
+import type { Role } from '../services/authService';
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: typeof Home;
+  roles: Role[];
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { to: '/dashboard/inicio', label: 'Inicio', icon: Home, roles: ['ANALISTA', 'TRABAJADOR'] },
+  { to: '/dashboard/limpiardatos', label: 'Carga y Limpieza', icon: Upload, roles: ['ANALISTA'] },
+  { to: '/dashboard/procesar', label: 'Procesar', icon: FileSpreadsheet, roles: ['ANALISTA'] },
+  { to: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp, roles: ['ANALISTA'] },
+  { to: '/dashboard/reportes', label: 'Reportes', icon: BarChart3, roles: ['ANALISTA', 'TRABAJADOR'] },
+  { to: '/dashboard/tareas', label: 'Tareas', icon: ClipboardList, roles: ['ANALISTA', 'TRABAJADOR'] },
+  { to: '/dashboard/inteligencia', label: 'Negocio/Inteligencia', icon: BrainCircuit, roles: ['TRABAJADOR'] },
+  { to: '/dashboard/trabajadores', label: 'Equipo', icon: Users, roles: ['ANALISTA'] },
+];
 
 function Sidebar() {
+  const usuario = getCurrentUser();
+  const visibles = NAV_ITEMS.filter((item) => !usuario || item.roles.includes(usuario.role));
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <h3>Mercamax Analysis</h3>
       </div>
       <nav className="sidebar-nav">
-        <NavLink to="/dashboard/Inicio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Home size={16} strokeWidth={2.2} />
-            Inicio
-          </span>
-        </NavLink>
-        <NavLink to="/dashboard/limpiardatos" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Upload size={16} strokeWidth={2.2} />
-            Carga y Limpieza
-          </span>
-        </NavLink>
-        <NavLink to="/dashboard/procesar" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-            <FileSpreadsheet size={16} strokeWidth={2.2} />
-            Procesar
-          </span>
-        </NavLink>
-        <NavLink to="/dashboard/ventas" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-            <TrendingUp size={16} strokeWidth={2.2} />
-            Ventas
-          </span>
-        </NavLink>
-        <NavLink to="/dashboard/reportes" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-            <BarChart3 size={16} strokeWidth={2.2} />
-            Reportes
-          </span>
-        </NavLink>
-        <NavLink to="/dashboard/Inteligencia" className="sidebar-link">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-            <BrainCircuit size={16} strokeWidth={2.2} />
-            Negocio/Inteligencia
-          </span>
-        </NavLink>
+        {visibles.map(({ to, label, icon: Icon }) => (
+          <NavLink key={to} to={to} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Icon size={16} strokeWidth={2.2} />
+              {label}
+            </span>
+          </NavLink>
+        ))}
       </nav>
       <div className="sidebar-footer">
         <NavLink to="/" className="sidebar-link back-link">

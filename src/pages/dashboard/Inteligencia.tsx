@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -10,7 +10,12 @@ import {
   Title,
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { Trash2, Tag, DollarSign, PieChart as PieIcon, Percent } from 'lucide-react';
+import { CheckCircle2, Save, Trash2, Tag, DollarSign, PieChart as PieIcon, Percent } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
+import { completarTarea, listarTareas } from '../../services/tareaService';
+import { marcarComoLimpio } from '../../services/csvService';
+import type { DashboardContextType } from '../../types/csv';
+import type { Tarea } from '../../types/tarea';
 
 ChartJS.register(
   ArcElement,
@@ -47,6 +52,15 @@ interface Promocion {
 }
 
 const Inteligencia: React.FC = () => {
+  const { files, updateFile } = useOutletContext<DashboardContextType>();
+  const [tareas, setTareas] = useState<Tarea[]>([]);
+  const [tareaSeleccionada, setTareaSeleccionada] = useState('');
+  const [csvSeleccionado, setCsvSeleccionado] = useState('');
+  const [columnaNueva, setColumnaNueva] = useState('');
+  const [valorInicial, setValorInicial] = useState('');
+  const [guardandoCambio, setGuardandoCambio] = useState(false);
+  const [mensajeCambio, setMensajeCambio] = useState<string | null>(null);
+  const [errorCambio, setErrorCambio] = useState<string | null>(null);
   const [tabActiva, setTabActiva] = useState<'ofertas' | 'promociones'>('ofertas');
 
   const [listaOfertas, setListaOfertas] = useState<Oferta[]>([]);
@@ -75,6 +89,70 @@ const Inteligencia: React.FC = () => {
     finPromocion: '',
     estado: 'Activo',
   });
+
+  const tareasDisponibles = tareas.filter((tarea) => tarea.estado !== 'COMPLETADA');
+  const tareaActual = tareas.find((tarea) => tarea.id === tareaSeleccionada);
+  const csvDisponibles = files.filter((file) =>
+    (file.origen ?? 'propio') === 'propio' || file.id === tareaActual?.datasetPropioId,
+  );
+  const csvActual = csvDisponibles.find((file) => file.id === csvSeleccionado);
+
+  useEffect(() => {
+    void listarTareas().then(setTareas).catch(() => setErrorCambio('No se pudieron cargar las tareas asignadas.'));
+  }, []);
+
+  useEffect(() => {
+    if (!tareaActual?.columnaRelacionada) return;
+    setColumnaNueva(tareaActual.columnaRelacionada);
+  }, [tareaActual?.id, tareaActual?.columnaRelacionada]);
+
+  useEffect(() => {
+    if (tareaActual?.datasetPropioId && csvDisponibles.some((file) => file.id === tareaActual.datasetPropioId)) {
+      setCsvSeleccionado(tareaActual.datasetPropioId);
+    }
+  }, [tareaActual?.id, tareaActual?.datasetPropioId, csvDisponibles]);
+
+  const handleAplicarCambio = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!tareaActual || !csvActual || !columnaNueva.trim()) return;
+    if (csvActual.headers.includes(columnaNueva.trim())) {
+      setErrorCambio('Esa columna ya existe en el CSV seleccionado.');
+      return;
+    }
+
+    setGuardandoCambio(true);
+    setMensajeCambio(null);
+    setErrorCambio(null);
+    try {
+      const nombreColumna = columnaNueva.trim();
+      const filasActualizadas = csvActual.rows.map((row) => [...row, valorInicial]);
+      const archivoActualizado = {
+        ...csvActual,
+        headers: [...csvActual.headers, nombreColumna],
+        rows: filasActualizadas,
+        isClean: true,
+      };
+
+      if (csvActual.synced && csvActual.id) {
+        const contenido = [archivoActualizado.headers, ...filasActualizadas]
+          .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+          .join('\n');
+        const archivo = new File([contenido], `${csvActual.name.replace(/\.csv$/i, '')}-actualizado.csv`, { type: 'text/csv' });
+        await marcarComoLimpio(csvActual.id, archivo, { filasCount: filasActualizadas.length, columnCount: archivoActualizado.headers.length });
+      }
+
+      updateFile(archivoActualizado);
+      const tareaCompletada = await completarTarea(tareaActual.id);
+      setTareas((actuales) => actuales.map((tarea) => (tarea.id === tareaCompletada.id ? tareaCompletada : tarea)));
+      setMensajeCambio(`Se agregó la columna "${nombreColumna}" y se completó la tarea.`);
+      setColumnaNueva('');
+      setValorInicial('');
+    } catch (err) {
+      setErrorCambio(err instanceof Error ? err.message : 'No se pudo guardar el cambio en el CSV.');
+    } finally {
+      setGuardandoCambio(false);
+    }
+  };
 
   // Handlers para agregar
   const handleCrearOferta = (e: React.FormEvent) => {
@@ -245,6 +323,61 @@ const Inteligencia: React.FC = () => {
 
   return (
     <div style={{ padding: '30px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc' }}>
+      <section style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '10px', border: '1px solid #bae6fd', marginBottom: '25px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          <CheckCircle2 size={22} color="#0284c7" />
+          <h2 style={{ margin: 0, color: '#0f172a', fontSize: '20px' }}>Trabajo asignado</h2>
+        </div>
+        <p style={{ margin: '0 0 18px', color: '#64748b', fontSize: '14px' }}>
+          Aplica en tu CSV los cambios detectados por el Analista y completa la tarea cuando termines.
+        </p>
+
+        {mensajeCambio && <div className="alert-success" style={{ marginBottom: '14px' }}>{mensajeCambio}</div>}
+        {errorCambio && <div className="alert-error" style={{ marginBottom: '14px' }}>{errorCambio}</div>}
+
+        {!tareasDisponibles.length ? (
+          <p style={{ margin: 0, color: '#64748b' }}>No tienes tareas pendientes.</p>
+        ) : (
+          <form onSubmit={handleAplicarCambio}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', marginBottom: '15px' }}>
+              <div>
+                <label style={labelStyle} htmlFor="tarea-inteligencia">Tarea</label>
+                <select id="tarea-inteligencia" value={tareaSeleccionada} onChange={(event) => setTareaSeleccionada(event.target.value)} style={inputStyle} required>
+                  <option value="">Selecciona una tarea</option>
+                  {tareasDisponibles.map((tarea) => <option key={tarea.id} value={tarea.id}>{tarea.titulo}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle} htmlFor="csv-inteligencia">CSV propio</label>
+                <select id="csv-inteligencia" value={csvSeleccionado} onChange={(event) => setCsvSeleccionado(event.target.value)} style={inputStyle} required>
+                  <option value="">Selecciona un archivo</option>
+                  {csvDisponibles.map((file) => <option key={file.id} value={file.id}>{file.name} ({file.origen === 'otro' ? 'competencia' : 'propio'})</option>)}
+                </select>
+              </div>
+            </div>
+
+            {tareaActual && <p style={{ margin: '0 0 15px', padding: '12px', backgroundColor: '#f0f9ff', color: '#0c4a6e', borderRadius: '6px', fontSize: '14px' }}>{tareaActual.descripcion}</p>}
+
+            {tareaActual?.datasetPropioId && <p style={{ margin: '-5px 0 15px', color: '#64748b', fontSize: '12px' }}>Esta tarea está relacionada con un CSV propio específico.</p>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', marginBottom: '15px' }}>
+              <div>
+                <label style={labelStyle} htmlFor="columna-nueva">Nombre de la columna faltante</label>
+                <input id="columna-nueva" value={columnaNueva} onChange={(event) => setColumnaNueva(event.target.value)} style={inputStyle} placeholder="Ej. descuento" required />
+              </div>
+              <div>
+                <label style={labelStyle} htmlFor="valor-inicial">Valor inicial para las filas existentes</label>
+                <input id="valor-inicial" value={valorInicial} onChange={(event) => setValorInicial(event.target.value)} style={inputStyle} placeholder="Ej. 0" />
+              </div>
+            </div>
+
+            <button type="submit" disabled={guardandoCambio || !csvActual} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+              <Save size={16} />
+              {guardandoCambio ? 'Guardando...' : 'Guardar cambio y completar tarea'}
+            </button>
+          </form>
+        )}
+      </section>
       
       {/* TABS DE NAVEGACIÓN */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>

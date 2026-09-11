@@ -415,7 +415,11 @@ export default function InsightsView({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.35rem' }}>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: TEXT_PRIMARY }}>Alertas y hallazgos</h3>
                 </div>
-                <InsightList insights={localInsights} emptyMessage="No se encontraron diferencias relevantes entre ambos datasets." />
+                <InsightList
+                  insights={localInsights}
+                  emptyMessage="No se encontraron diferencias relevantes entre ambos datasets."
+                  datasetPropioId={datasetA?.id}
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.4rem' }}>

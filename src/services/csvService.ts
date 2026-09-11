@@ -24,7 +24,7 @@ export interface ListarCsvResponse {
 }
 
 function getToken(): string | null {
-  return localStorage.getItem('auth_token');
+  return sessionStorage.getItem('auth_token');
 }
 
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
