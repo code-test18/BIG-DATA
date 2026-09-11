@@ -24,6 +24,10 @@ function Contact() {
               <input type="email" className="form-input" placeholder="correo@ejemplo.com" required />
             </div>
             <div className="form-group">
+              <label className="form-label">Teléfono</label>
+              <input type="email" className="form-input" placeholder="999999999" required />
+            </div>
+            <div className="form-group">
               <label className="form-label">Mensaje</label>
               <textarea className="form-input" rows={4} placeholder="Escribe tu mensaje..." required style={{ resize: 'vertical' }}></textarea>
             </div>

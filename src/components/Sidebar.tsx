@@ -7,7 +7,6 @@ import {
   Home,
   TrendingUp,
   Upload,
-  Users,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { getCurrentUser } from '../utils/auth';
@@ -28,7 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard/reportes', label: 'Reportes', icon: BarChart3, roles: ['ANALISTA', 'TRABAJADOR'] },
   { to: '/dashboard/tareas', label: 'Tareas', icon: ClipboardList, roles: ['ANALISTA', 'TRABAJADOR'] },
   { to: '/dashboard/inteligencia', label: 'Negocio/Inteligencia', icon: BrainCircuit, roles: ['TRABAJADOR'] },
-  { to: '/dashboard/trabajadores', label: 'Equipo', icon: Users, roles: ['ANALISTA'] },
+  { to: '/dashboard/solicitudes', label: 'Solicitudes', icon: ClipboardList, roles: ['ANALISTA'] },
 ];
 
 function Sidebar() {
