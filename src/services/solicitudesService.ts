@@ -1,88 +1,132 @@
-export type SolicitudFuente = 'LANDING' | 'CONTACTO';
-export type SolicitudEstado = 'NUEVA' | 'PENDIENTE' | 'ATENDIDA';
+const API_URL = import.meta.env.VITE_API_URL || 'https://backend-api-production-6a5a.up.railway.app';
+
+export type SolicitudEstado = 'PENDIENTE' | 'RESPONDIDA';
 
 export interface Solicitud {
   id: string;
-  nombre: string;
-  email: string;
+  nombreCompleto: string;
+  correo: string;
   telefono: string;
-  asunto: string;
   mensaje: string;
-  fuente: SolicitudFuente;
   estado: SolicitudEstado;
+  respuesta: string | null;
+  respondidaAt: string | null;
   createdAt: string;
 }
 
 export interface CrearSolicitudInput {
-  nombre: string;
-  email: string;
+  nombreCompleto: string;
+  correo: string;
   telefono?: string;
-  asunto?: string;
   mensaje: string;
-  fuente: SolicitudFuente;
 }
 
-const STORAGE_KEY = 'bigdata_solicitudes';
+export interface CrearSolicitudResponse {
+  message: string;
+  solicitud: Solicitud;
+}
 
-function leerSolicitudes(): Solicitud[] {
-  if (typeof window === 'undefined') return [];
+export interface SolicitudRespuestaResponse {
+  message: string;
+  solicitud: Solicitud;
+}
 
+function getToken(): string | null {
+  return sessionStorage.getItem('auth_token');
+}
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+
+  let data: unknown = null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    data = await res.json();
   } catch {
-    return [];
+    // la API puede devolver respuesta vacía
   }
+
+  if (!res.ok) {
+    const message = (data as { message?: string } | null)?.message || `Error ${res.status}`;
+    const error = new Error(message) as Error & { status?: number };
+    error.status = res.status;
+    throw error;
+  }
+
+  return data as T;
 }
 
-function guardarSolicitudes(solicitudes: Solicitud[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(solicitudes));
-}
+export async function crearSolicitud(input: CrearSolicitudInput): Promise<Solicitud> {
+  const { solicitud } = await apiFetch<CrearSolicitudResponse>('/solicitudes', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombreCompleto: input.nombreCompleto,
+      correo: input.correo,
+      telefono: input.telefono ?? '',
+      mensaje: input.mensaje,
+    }),
+  });
 
-export function listarSolicitudes(): Solicitud[] {
-  return [...leerSolicitudes()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
-
-export function crearSolicitud(input: CrearSolicitudInput): Solicitud {
-  const solicitud: Solicitud = {
-    id: crypto.randomUUID(),
-    nombre: input.nombre.trim(),
-    email: input.email.trim(),
-    telefono: (input.telefono ?? '').trim(),
-    asunto: (input.asunto ?? '').trim() || 'Consulta general',
-    mensaje: input.mensaje.trim(),
-    fuente: input.fuente,
-    estado: 'NUEVA',
-    createdAt: new Date().toISOString(),
-  };
-
-  const solicitudes = leerSolicitudes();
-  solicitudes.unshift(solicitud);
-  guardarSolicitudes(solicitudes);
   return solicitud;
 }
 
-export function actualizarEstadoSolicitud(id: string, estado: SolicitudEstado): Solicitud | null {
-  const solicitudes = leerSolicitudes();
-  const index = solicitudes.findIndex((solicitud) => solicitud.id === id);
-  if (index === -1) return null;
+export async function listarSolicitudes(): Promise<Solicitud[]> {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Debes iniciar sesión como analista para ver las solicitudes.');
+  }
 
-  solicitudes[index] = { ...solicitudes[index], estado };
-  guardarSolicitudes(solicitudes);
-  return solicitudes[index];
+  return apiFetch<Solicitud[]>('/solicitudes', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 }
 
-export function obtenerResumenSolicitudes() {
-  const solicitudes = listarSolicitudes();
+export async function responderSolicitud(id: string, respuesta: string): Promise<Solicitud> {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Debes iniciar sesión como analista para responder solicitudes.');
+  }
+
+  const { solicitud } = await apiFetch<SolicitudRespuestaResponse>(`/solicitudes/${id}/responder`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ respuesta }),
+  });
+
+  return solicitud;
+}
+
+export async function editarRespuestaSolicitud(id: string, respuesta: string): Promise<Solicitud> {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Debes iniciar sesión como analista para editar la respuesta.');
+  }
+
+  const { solicitud } = await apiFetch<SolicitudRespuestaResponse>(`/solicitudes/${id}/editar-respuesta`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ respuesta }),
+  });
+
+  return solicitud;
+}
+
+export function obtenerResumenSolicitudes(solicitudes: Solicitud[]) {
   return {
     total: solicitudes.length,
-    nuevas: solicitudes.filter((s) => s.estado === 'NUEVA').length,
     pendientes: solicitudes.filter((s) => s.estado === 'PENDIENTE').length,
-    atendidas: solicitudes.filter((s) => s.estado === 'ATENDIDA').length,
-    landing: solicitudes.filter((s) => s.fuente === 'LANDING').length,
-    contacto: solicitudes.filter((s) => s.fuente === 'CONTACTO').length,
+    respondidas: solicitudes.filter((s) => s.estado === 'RESPONDIDA').length,
   };
 }
