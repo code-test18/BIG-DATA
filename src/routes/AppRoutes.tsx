@@ -20,7 +20,6 @@ const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
 const Inteligencia = lazy(() => import('../pages/dashboard/Inteligencia'));
 const Solicitudes = lazy(() => import('../pages/dashboard/Solicitudes'));
 const Tareas = lazy(() => import('../pages/dashboard/Tareas'));
-
 function AppRoutes() {
   return (
     <Suspense fallback={<div className="p-4 text-center">Cargando módulo...</div>}>
