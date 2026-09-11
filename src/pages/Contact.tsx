@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { type ChangeEvent, type SyntheticEvent, useState } from 'react';
 import { sendContactMessage } from '../services/contactService';
 
@@ -49,6 +50,14 @@ function Contact() {
     } finally {
       setIsSubmitting(false);
     }
+=======
+import { type SyntheticEvent } from 'react';
+
+function Contact() {
+  const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    alert('Mensaje enviado correctamente. Nos pondremos en contacto contigo.');
+>>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
   };
 
   return (
@@ -62,6 +71,7 @@ function Contact() {
           <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
             <div className="form-group">
               <label className="form-label">Nombre Completo</label>
+<<<<<<< HEAD
               <input
                 type="text"
                 name="name"
@@ -114,6 +124,23 @@ function Contact() {
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               {isSubmitting ? 'Enviando...' : 'Enviar Mensaje'}
             </button>
+=======
+              <input type="text" className="form-input" placeholder="Tu nombre" required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Correo Electrónico</label>
+              <input type="email" className="form-input" placeholder="correo@ejemplo.com" required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Teléfono</label>
+              <input type="email" className="form-input" placeholder="999999999" required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Mensaje</label>
+              <textarea className="form-input" rows={4} placeholder="Escribe tu mensaje..." required style={{ resize: 'vertical' }}></textarea>
+            </div>
+            <button type="submit" className="btn btn-primary">Enviar Mensaje</button>
+>>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
           </form>
         </div>
 

@@ -7,7 +7,10 @@ import {
   Home,
   TrendingUp,
   Upload,
+<<<<<<< HEAD
   Users,
+=======
+>>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { getCurrentUser } from '../utils/auth';
@@ -28,7 +31,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard/reportes', label: 'Reportes', icon: BarChart3, roles: ['ANALISTA', 'TRABAJADOR'] },
   { to: '/dashboard/tareas', label: 'Tareas', icon: ClipboardList, roles: ['ANALISTA', 'TRABAJADOR'] },
   { to: '/dashboard/inteligencia', label: 'Negocio/Inteligencia', icon: BrainCircuit, roles: ['TRABAJADOR'] },
+<<<<<<< HEAD
   { to: '/dashboard/trabajadores', label: 'Equipo', icon: Users, roles: ['ANALISTA'] },
+=======
+  { to: '/dashboard/solicitudes', label: 'Solicitudes', icon: ClipboardList, roles: ['ANALISTA'] },
+>>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
 ];
 
 function Sidebar() {
