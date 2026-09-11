@@ -9,6 +9,49 @@ export interface AuthUser {
   role: Role;
 }
 
+export interface LoginSimulado {
+  user: AuthUser;
+  token: string;
+}
+
+const USUARIOS_SIMULADOS: Array<{ email: string; password: string; user: AuthUser }> = [
+  {
+    email: 'analistabigdata2@gmail.com',
+    password: '12345678',
+    user: {
+      id: 'simulado-analista',
+      name: 'Analista Big Data',
+      email: 'analistabigdata2@gmail.com',
+      role: 'ANALISTA',
+    },
+  },
+  {
+    email: 'roxana@gmail.com',
+    password: '12345678',
+    user: {
+      id: 'simulado-trabajador',
+      name: 'Roxana',
+      email: 'roxana@gmail.com',
+      role: 'TRABAJADOR',
+    },
+  },
+];
+
+export function loginSimulado(email: string, password: string): LoginSimulado | null {
+  const usuario = USUARIOS_SIMULADOS.find(
+    (item) => item.email === email.trim().toLowerCase() && item.password === password,
+  );
+
+  if (!usuario) return null;
+
+  return {
+    user: usuario.user,
+    token: usuario.user.role === 'ANALISTA'
+      ? import.meta.env.VITE_ANALISTA_TOKEN ?? ''
+      : 'token-simulado',
+  };
+}
+
 export interface LoginOtpEnviado {
   tipo: 'otp_enviado';
   userId: string; // TODO: confirmar que el backend efectivamente devuelve esto para el Analista

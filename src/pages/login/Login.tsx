@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type SyntheticEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { consultarEstadoLoginRequest, login, resendOtp, verifyOtp } from '../../services/authService';
+import { consultarEstadoLoginRequest, login, loginSimulado, resendOtp, verifyOtp } from '../../services/authService';
 import { guardarSesion } from '../../utils/auth';
 
 const OTP_LENGTH = 6;
@@ -51,6 +51,13 @@ function Login() {
     }
     if (!password) {
       setError('Por favor, ingresa tu contraseña.');
+      return;
+    }
+
+    const usuarioSimulado = loginSimulado(email, password);
+    if (usuarioSimulado) {
+      guardarSesion(usuarioSimulado.token, usuarioSimulado.user);
+      navigate('/dashboard/inicio');
       return;
     }
 
