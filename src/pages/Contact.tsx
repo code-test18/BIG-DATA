@@ -1,47 +1,39 @@
-import { type ChangeEvent, type SyntheticEvent, useState } from 'react';
-import { sendContactMessage } from '../services/contactService';
+import { useState, type FormEvent } from 'react';
+import { crearSolicitud } from '../services/solicitudesService';
 
-interface ContactFormState {
-  name: string;
-  email: string;
-  message: string;
-}
-
-const initialForm: ContactFormState = {
-  name: '',
-  email: '',
-  message: '',
+const initialForm = {
+  nombreCompleto: '',
+  correo: '',
+  telefono: '',
+  mensaje: '',
 };
 
 function Contact() {
-  const [form, setForm] = useState<ContactFormState>(initialForm);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [form, setForm] = useState(initialForm);
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setStatus(null);
+    setError(null);
+    setLoading(true);
 
     try {
-      const payload = {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        message: form.message.trim(),
-      };
+      await crearSolicitud({
+        nombreCompleto: form.nombreCompleto,
+        correo: form.correo,
+        telefono: form.telefono,
+        mensaje: form.mensaje,
+      });
 
-      await sendContactMessage(payload);
+      setEnviado(true);
       setForm(initialForm);
-      setStatus({ type: 'success', message: 'Mensaje enviado correctamente. Nos pondremos en contacto contigo.' });
-    } catch (error) {
-      setStatus({ type: 'error', message: error instanceof Error ? error.message : 'No se pudo enviar el mensaje.' });
+    } catch (err) {
+      setEnviado(false);
+      setError(err instanceof Error ? err.message : 'No se pudo enviar el mensaje.');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -56,59 +48,28 @@ function Contact() {
           <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
             <div className="form-group">
               <label className="form-label">Nombre Completo</label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Tu nombre"
-                required
-              />
+              <input type="text" className="form-input" placeholder="Tu nombre" value={form.nombreCompleto} onChange={(event) => setForm((actual) => ({ ...actual, nombreCompleto: event.target.value }))} required />
             </div>
             <div className="form-group">
               <label className="form-label">Correo Electrónico</label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="correo@ejemplo.com"
-                required
-              />
+              <input type="email" className="form-input" placeholder="correo@ejemplo.com" value={form.correo} onChange={(event) => setForm((actual) => ({ ...actual, correo: event.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Teléfono</label>
+              <input type="tel" className="form-input" placeholder="972 123 456" value={form.telefono} onChange={(event) => setForm((actual) => ({ ...actual, telefono: event.target.value }))} />
             </div>
             <div className="form-group">
               <label className="form-label">Mensaje</label>
-              <textarea
-                name="message"
-                value={form.message}
-                onChange={handleChange}
-                className="form-input"
-                rows={4}
-                placeholder="Escribe tu mensaje..."
-                required
-                style={{ resize: 'vertical' }}
-              />
+              <textarea className="form-input" rows={4} placeholder="Escribe tu mensaje..." value={form.mensaje} onChange={(event) => setForm((actual) => ({ ...actual, mensaje: event.target.value }))} required style={{ resize: 'vertical' }}></textarea>
             </div>
-
-            {status && (
-              <div
-                style={{
-                  marginBottom: '1rem',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  background: status.type === 'success' ? '#dcfce7' : '#fee2e2',
-                  color: status.type === 'success' ? '#166534' : '#991b1b',
-                  border: `1px solid ${status.type === 'success' ? '#86efac' : '#fca5a5'}`,
-                }}
-              >
-                {status.message}
+            {error && <div className="alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+            {enviado && (
+              <div className="alert-success" style={{ marginBottom: '1rem' }}>
+                Tu mensaje fue enviado correctamente. La solicitud quedó registrada para revisión.
               </div>
             )}
-
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Enviando...' : 'Enviar Mensaje'}
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Enviando...' : 'Enviar Mensaje'}
             </button>
           </form>
         </div>

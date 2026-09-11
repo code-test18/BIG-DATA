@@ -1,187 +1,196 @@
-import { useState, useEffect } from 'react';
-import { Mail, Phone, User, Calendar, CheckCircle, Clock, Trash2, Inbox } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { MailCheck, UserRound } from 'lucide-react';
+import {
+  editarRespuestaSolicitud,
+  listarSolicitudes,
+  obtenerResumenSolicitudes,
+  responderSolicitud,
+  type Solicitud,
+  type SolicitudEstado,
+} from '../../services/solicitudesService';
 
-interface Solicitud {
-  id: string;
-  nombre: string;
-  email: string;
-  telefono: string;
-  mensaje: string;
-  fecha: string;
-  estado: 'PENDIENTE' | 'ATENDIDO';
-}
+const ESTADO_LABEL: Record<SolicitudEstado, string> = {
+  PENDIENTE: 'Pendiente',
+  RESPONDIDA: 'Respondida',
+};
 
-const SOLICITUDES_INICIALES: Solicitud[] = [
-  {
-    id: '1',
-    nombre: 'Carlos Mendoza',
-    email: 'carlos.mendoza@example.com',
-    telefono: '+51 987654321',
-    mensaje: 'Hola, me interesa contratar el plan empresarial para optimizar las ventas de mi sucursal.',
-    fecha: '2026-09-10 14:30',
-    estado: 'PENDIENTE',
-  },
-  {
-    id: '2',
-    nombre: 'Ana Torres',
-    email: 'ana.torres@example.com',
-    telefono: '+51 912345678',
-    mensaje: 'Solicito información sobre los reportes automatizados de inventario.',
-    fecha: '2026-09-09 11:15',
-    estado: 'ATENDIDO',
-  },
-];
+const ESTADO_COLORS: Record<SolicitudEstado, { bg: string; text: string; border: string }> = {
+  PENDIENTE: { bg: '#fff7ed', text: '#c2410c', border: '#fdba74' },
+  RESPONDIDA: { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' },
+};
 
-export default function Solicitudes() {
+function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
-  const [cargando, setCargando] = useState<boolean>(true);
-  const [filtro, setFiltro] = useState<'TODOS' | 'PENDIENTE' | 'ATENDIDO'>('TODOS');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [respuestas, setRespuestas] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const cargarSolicitudes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listarSolicitudes();
+      setSolicitudes(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar las solicitudes.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const cargarDatosSimulados = async () => {
-      setCargando(true);
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        setSolicitudes(SOLICITUDES_INICIALES);
-      } catch (error) {
-        console.error('Error al cargar solicitudes:', error);
-      } finally {
-        setCargando(false);
-      }
-    };
-    cargarDatosSimulados();
+    void cargarSolicitudes();
   }, []);
 
-  const cambiarEstado = (id: string, nuevoEstado: 'PENDIENTE' | 'ATENDIDO') => {
-    setSolicitudes((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, estado: nuevoEstado } : item))
-    );
-  };
+  const resumen = useMemo(() => obtenerResumenSolicitudes(solicitudes), [solicitudes]);
 
-  const eliminarSolicitud = (id: string) => {
-    setSolicitudes((prev) => prev.filter((item) => item.id !== id));
-  };
+  const handleGuardarRespuesta = async (solicitud: Solicitud) => {
+    const respuesta = (respuestas[solicitud.id] ?? solicitud.respuesta ?? '').trim();
+    if (!respuesta) {
+      setError('Escribe una respuesta antes de guardar.');
+      return;
+    }
 
-  const solicitudesFiltradas = solicitudes.filter((item) => {
-    if (filtro === 'TODOS') return true;
-    return item.estado === filtro;
-  });
+    setError(null);
+    setSuccess(null);
+    setSavingId(solicitud.id);
+
+    try {
+      const actualizada = solicitud.estado === 'RESPONDIDA'
+        ? await editarRespuestaSolicitud(solicitud.id, respuesta)
+        : await responderSolicitud(solicitud.id, respuesta);
+
+      setSolicitudes((actuales) => actuales.map((item) => (item.id === actualizada.id ? actualizada : item)));
+      setRespuestas((actual) => ({ ...actual, [actualizada.id]: actualizada.respuesta ?? '' }));
+      setSuccess(solicitud.estado === 'RESPONDIDA' ? 'Respuesta actualizada correctamente.' : 'Respuesta enviada correctamente al cliente.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la respuesta.');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/20 min-h-screen">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl">
-            <Inbox size={28} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Solicitudes de Clientes</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Bandeja de mensajes entrantes desde la landing page.</p>
-          </div>
-        </div>
-
-        {/* Segmented filter control */}
-        <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-          {(['TODOS', 'PENDIENTE', 'ATENDIDO'] as const).map((estadoItem) => (
-            <button
-              key={estadoItem}
-              onClick={() => setFiltro(estadoItem)}
-              className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                filtro === estadoItem
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {estadoItem}
-            </button>
-          ))}
+    <div className="dashboard-page">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <div>
+          <h2>Solicitudes</h2>
+          <p>Consultas recibidas desde la landing page y contacto, con respuesta por parte del analista.</p>
         </div>
       </div>
 
-      {/* Content grid */}
-      {cargando ? (
-        <div className="flex justify-center items-center py-20 text-slate-400 font-medium">
-          Cargando solicitudes...
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="metric-card" style={{ padding: '1.25rem' }}>
+          <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Total</div>
+          <div style={{ marginTop: '0.45rem', fontSize: '1.8rem', fontWeight: 700, color: '#0f172a' }}>{resumen.total}</div>
         </div>
-      ) : solicitudesFiltradas.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-400">
-          <Inbox size={48} className="mx-auto mb-3 opacity-40" />
-          <p className="font-medium text-slate-600">No hay solicitudes en esta sección.</p>
+        <div className="metric-card" style={{ padding: '1.25rem' }}>
+          <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Pendientes</div>
+          <div style={{ marginTop: '0.45rem', fontSize: '1.8rem', fontWeight: 700, color: '#c2410c' }}>{resumen.pendientes}</div>
+        </div>
+        <div className="metric-card" style={{ padding: '1.25rem' }}>
+          <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Respondidas</div>
+          <div style={{ marginTop: '0.45rem', fontSize: '1.8rem', fontWeight: 700, color: '#047857' }}>{resumen.respondidas}</div>
+        </div>
+      </div>
+
+      {error && <div className="alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+      {success && <div className="alert-success" style={{ marginBottom: '1rem' }}>{success}</div>}
+
+      {loading ? (
+        <div className="dashboard-card" style={{ padding: '2rem', textAlign: 'center' }}>
+          <p>Cargando solicitudes...</p>
+        </div>
+      ) : !solicitudes.length ? (
+        <div className="dashboard-card" style={{ padding: '2rem', textAlign: 'center' }}>
+          <MailCheck size={36} style={{ margin: '0 auto 0.75rem', color: '#64748b' }} />
+          <h3 style={{ marginBottom: '0.5rem' }}>No hay solicitudes todavía</h3>
+          <p>Aquí aparecerán las consultas recibidas desde la landing y contacto.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {solicitudesFiltradas.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl shadow-sm border border-slate-100/80 p-6 flex flex-col justify-between space-y-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group"
-            >
-              {/* Top border accent line */}
-              <div className={`absolute top-0 left-0 right-0 h-1.5 ${item.estado === 'PENDIENTE' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide ${
-                      item.estado === 'PENDIENTE'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                    }`}
-                  >
-                    {item.estado === 'PENDIENTE' ? <Clock size={13} /> : <CheckCircle size={13} />}
-                    {item.estado}
-                  </span>
-                  <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
-                    <Calendar size={13} /> {item.fecha}
-                  </span>
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          {solicitudes.map((solicitud) => (
+            <article key={solicitud.id} className="dashboard-card" style={{ padding: '1rem 1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                    <UserRound size={16} color="#475569" />
+                    <strong style={{ color: '#0f172a' }}>{solicitud.nombreCompleto}</strong>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.9rem' }}>{solicitud.correo}</div>
                 </div>
-
-                <div className="space-y-1">
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-base">
-                    <User size={16} className="text-blue-600" /> {item.nombre}
-                  </h3>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <Mail size={13} className="text-slate-400" /> {item.email}
-                  </p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <Phone size={13} className="text-slate-400" /> {item.telefono}
-                  </p>
-                </div>
-
-                <div className="bg-slate-50/80 p-3.5 rounded-xl text-sm text-slate-600 border border-slate-100 leading-relaxed">
-                  <p className="italic">"{item.mensaje}"</p>
-                </div>
+                <span
+                  style={{
+                    background: ESTADO_COLORS[solicitud.estado].bg,
+                    color: ESTADO_COLORS[solicitud.estado].text,
+                    border: `1px solid ${ESTADO_COLORS[solicitud.estado].border}`,
+                    borderRadius: '999px',
+                    padding: '0.35rem 0.7rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {ESTADO_LABEL[solicitud.estado]}
+                </span>
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                {item.estado === 'PENDIENTE' ? (
-                  <button
-                    onClick={() => cambiarEstado(item.id, 'ATENDIDO')}
-                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50/60 hover:bg-emerald-100/60 transition-colors"
-                  >
-                    <CheckCircle size={14} /> Atender
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => cambiarEstado(item.id, 'PENDIENTE')}
-                    className="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50/60 hover:bg-amber-100/60 transition-colors"
-                  >
-                    <Clock size={14} /> Reactivar
-                  </button>
+              <div style={{ marginTop: '0.9rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Teléfono</div>
+                  <div style={{ marginTop: '0.15rem', fontWeight: 600 }}>{solicitud.telefono || 'No indicado'}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Fecha</div>
+                  <div style={{ marginTop: '0.15rem', fontWeight: 600 }}>{new Date(solicitud.createdAt).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                </div>
+                {solicitud.respondidaAt && (
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Respondida</div>
+                    <div style={{ marginTop: '0.15rem', fontWeight: 600 }}>{new Date(solicitud.respondidaAt).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                  </div>
                 )}
+              </div>
 
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Mensaje</div>
+                <p style={{ marginTop: '0.2rem', whiteSpace: 'pre-wrap', color: '#334155' }}>{solicitud.mensaje}</p>
+              </div>
+
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700, marginBottom: '0.4rem' }}>
+                  {solicitud.estado === 'RESPONDIDA' ? 'Editar respuesta' : 'Responder solicitud'}
+                </label>
+                <textarea
+                  className="form-input"
+                  rows={4}
+                  value={respuestas[solicitud.id] ?? solicitud.respuesta ?? ''}
+                  onChange={(event) => setRespuestas((actual) => ({ ...actual, [solicitud.id]: event.target.value }))}
+                  placeholder="Escribe la respuesta para el cliente..."
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
                 <button
-                  onClick={() => eliminarSolicitud(item.id)}
-                  className="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition-colors"
-                  title="Eliminar solicitud"
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: 'auto', padding: '0.5rem 0.9rem' }}
+                  disabled={savingId === solicitud.id}
+                  onClick={() => void handleGuardarRespuesta(solicitud)}
                 >
-                  <Trash2 size={16} />
+                  {savingId === solicitud.id ? 'Guardando...' : (solicitud.estado === 'RESPONDIDA' ? 'Actualizar respuesta' : 'Enviar respuesta')}
                 </button>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
     </div>
   );
 }
+
+export default Solicitudes;
