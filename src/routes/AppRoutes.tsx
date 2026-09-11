@@ -1,17 +1,9 @@
-<<<<<<< HEAD
-=======
-<Route path="*" element={<Navigate to="/dashboard/inicio" replace />} />
->>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import MainLayout from '../layouts/MainLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 import RequireRole from '../components/RequireRole';
-<<<<<<< HEAD
-=======
-//import Solicitudes from '../pages/dashboard/Solicitudes';
->>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
 
 const Home = lazy(() => import('../pages/Home'));
 const About = lazy(() => import('../pages/About'));
@@ -26,16 +18,8 @@ const Procesar = lazy(() => import('../pages/dashboard/proceso/Procesar'));
 const LimpiarDatos = lazy(() => import('../pages/dashboard/LimpiarDatos'));
 const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
 const Inteligencia = lazy(() => import('../pages/dashboard/Inteligencia'));
-<<<<<<< HEAD
 const CrearTrabajador = lazy(() => import('../pages/dashboard/CrearTrabajador'));
 const Tareas = lazy(() => import('../pages/dashboard/Tareas'));
-
-=======
-const Solicitudes = lazy(() => import('../pages/dashboard/Solicitudes'));
-const Tareas = lazy(() => import('../pages/dashboard/Tareas'));
-
-
->>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
 function AppRoutes() {
   return (
     <Suspense fallback={<div className="p-4 text-center">Cargando módulo...</div>}>
@@ -59,12 +43,7 @@ function AppRoutes() {
           <Route path="reportes" element={<Reportes />} />
           <Route path="tareas" element={<RequireRole allowed={['ANALISTA', 'TRABAJADOR']}><Tareas /></RequireRole>} />
           <Route path="inteligencia" element={<RequireRole allowed={['TRABAJADOR']}><Inteligencia /></RequireRole>} />
-<<<<<<< HEAD
           <Route path="trabajadores" element={<RequireRole allowed={['ANALISTA']}><CrearTrabajador /></RequireRole>} />
-=======
-          <Route path="solicitudes" element={<RequireRole allowed={['ANALISTA']}><Solicitudes /></RequireRole>} />
-          
->>>>>>> 77707f84d6cca0078df08a15c66ddffbef7ac645
         </Route>
       </Routes>
     </Suspense>
