@@ -45,7 +45,12 @@ function LimpiarDatos() {
 
     for (let i = 0; i < total; i += chunkSize) {
       const chunk = activeFile.rows.slice(i, i + chunkSize);
-      cleanedRows.push(...cleanFile({ ...activeFile, rows: chunk }, fillValue).rows);
+      const cleanedChunk = await cleanFile({ ...activeFile, rows: chunk }, fillValue);
+      if (!cleanedChunk) {
+        setIsCleaning(false);
+        return;
+      }
+      cleanedRows.push(...cleanedChunk.rows);
 
       const currentProgress = Math.round((Math.min(i + chunkSize, total) / total) * 100);
       setProgress(currentProgress);
@@ -154,6 +159,8 @@ function LimpiarDatos() {
 
           <div className="card cleaning-actions"><h3>{activeFile.isClean ? 'CSV limpio' : 'Aplicar limpieza'}</h3><p>{activeFile.isClean ? 'Este archivo ya fue limpiado y está disponible para análisis.' : 'El diagnóstico no ha modificado el archivo. Escribe el valor para reemplazar los campos vacíos y confirma la limpieza.'}</p>{!activeFile.isClean && <div className="clean-action-row"><input className="form-input" value={fillValue} onChange={(event) => setFillValue(event.target.value)} placeholder="Valor de reemplazo" /><button className="btn btn-primary" onClick={handleClean} disabled={isCleaning}>{isCleaning ? 'Guardando...' : 'Limpiar y guardar CSV'}</button></div>}</div>
           <CsvCharts
+            datasetId={activeFile.id}
+            datasetName={activeFile.name}
             headers={activeFile.headers}
             rows={activeFile.rows}
             summary={qualitySummary!}

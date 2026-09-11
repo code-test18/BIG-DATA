@@ -1,11 +1,13 @@
 import {
   AlertCircle,
   BarChart3,
+  Building2,
   CheckCircle2,
   Database,
   FileSpreadsheet,
   Plus,
   Trash2,
+  User,
 } from 'lucide-react';
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -91,7 +93,6 @@ function Inicio() {
   const { files, addFile, removeFile, loadingFiles, loadError } = useOutletContext<DashboardContextType>();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(files[0]?.id ?? null);
 
-  const [showOriginPicker, setShowOriginPicker] = useState(false);
   const [pendingOrigin, setPendingOrigin] = useState<Origen | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -104,8 +105,8 @@ function Inicio() {
     [files, selectedFileId],
   );
 
-  const propios = files.filter((f) => (f.origen ?? 'propio') === 'propio');
-  const otros = files.filter((f) => f.origen === 'otro');
+  const propios = useMemo(() => files.filter((f) => (f.origen ?? 'propio') === 'propio'), [files]);
+  const otros = useMemo(() => files.filter((f) => f.origen === 'otro'), [files]);
   const pendientes = files.filter((f) => !f.isClean);
 
   const estructura = useMemo(
@@ -122,15 +123,10 @@ function Inicio() {
       .map(([tipo, count]) => ({ tipo, count }));
   }, [estructura]);
 
-  // Abre el picker de origen; el archivo se elige después de confirmar de dónde viene
-  const handleOpenUpload = () => {
+  // Cada grupo (propios/otros) llama esto con su origen fijo; abre el explorador directo.
+  const handleUploadClick = (origen: Origen) => {
     setUploadError(null);
-    setShowOriginPicker(true);
-  };
-
-  const handlePickOrigin = (origen: Origen) => {
     setPendingOrigin(origen);
-    setShowOriginPicker(false);
     setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
@@ -170,162 +166,282 @@ function Inicio() {
     }
   };
 
+  const handleDeleteFile = async (file: CsvFile) => {
+    if (!window.confirm(`¿Eliminar el archivo "${file.name}"?`)) return;
+    try {
+      await eliminarCsv(file.id);
+      removeFile(file.id);
+      if (selectedFile?.id === file.id) setSelectedFileId(null);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'No se pudo eliminar el archivo en el servidor.');
+    }
+  };
+
   return (
-    <div className="dashboard-page home-dashboard">
-      <div className="dashboard-heading">
-        <div>
-          <p className="eyebrow">Resumen del espacio de trabajo</p>
-          <h2>Inicio</h2>
-          <p>Una vista rápida de tus datasets cargados.</p>
-        </div>
-        <div className="dashboard-date">Actualizado hoy</div>
-      </div>
+    <>
+      <style>{`
+        .dataset-group {
+          margin-top: 1.25rem;
+        }
 
-      {loadingFiles && <div className="alert-success">Cargando tus CSVs guardados...</div>}
-      {loadError && <div className="alert-error">{loadError}</div>}
-      {isUploading && <div className="alert-success">Subiendo CSV...</div>}
-      {uploadError && <div className="alert-error">{uploadError}</div>}
+        .dataset-group-heading {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.78rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #64748b;
+          margin-bottom: 0.6rem;
+        }
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        onChange={handleFileSelected}
-        style={{ display: 'none' }}
-      />
+        .dataset-group-count {
+          background: #eef2ff;
+          color: #4338ca;
+          border-radius: 999px;
+          padding: 0.1rem 0.55rem;
+          font-size: 0.72rem;
+          font-weight: 700;
+        }
 
-      {showOriginPicker && (
-        <div className="modal-overlay" onClick={() => setShowOriginPicker(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>¿De dónde es este CSV?</h3>
-            <p>Elige el origen antes de seleccionar el archivo.</p>
-            <div className="modal-actions">
-              <button type="button" className="btn btn-primary" onClick={() => handlePickOrigin('propio')}>
-                CSV propio
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => handlePickOrigin('otro')}>
-                CSV de la competencia
-              </button>
-            </div>
-            <button type="button" className="modal-close" onClick={() => setShowOriginPicker(false)}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
+        .dataset-group-add {
+          margin-left: auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          border: 1px solid #cbd5e1;
+          background: #fff;
+          color: #475569;
+          cursor: pointer;
+          padding: 0;
+        }
 
-      <div className="dashboard-kpis">
-        <MetricCard icon={Database} label="Datasets cargados" value={files.length.toString()} accent />
-        <MetricCard icon={FileSpreadsheet} label="Propios" value={propios.length.toString()} />
-        <MetricCard icon={FileSpreadsheet} label="Otros" value={otros.length.toString()} />
-        <MetricCard icon={AlertCircle} label="Pendientes de limpiar" value={pendientes.length.toString()} />
-      </div>
+        .dataset-group-add:hover {
+          background: #eef2ff;
+          border-color: #6366f1;
+          color: #4338ca;
+        }
 
-      <div className="dashboard-main-grid">
-        <section className="dashboard-card chart-card">
-          <div className="card-heading">
-            <div>
-              <h3>Tipos de dato por columna</h3>
-              <p>Estructura del dataset seleccionado.</p>
-            </div>
-            <BarChart3 size={20} aria-hidden="true" />
-          </div>
-          {tiposData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={tiposData} dataKey="count" nameKey="tipo" innerRadius={62} outerRadius={92} paddingAngle={2}>
-                  {tiposData.map((item, index) => <Cell key={item.tipo} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(value, name) => [`${value} columna(s)`, name]} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : <ChartEmpty message="Carga un CSV para ver su estructura." />}
-        </section>
-
-        <section className="dashboard-card dataset-card">
-          <div className="card-heading">
-            <div>
-              <h3>Datasets</h3>
-              <p>Selecciona uno para ver su detalle.</p>
-            </div>
-            <button type="button" className="icon-button-round" aria-label="Agregar CSV" title="Agregar CSV" onClick={handleOpenUpload}>
-              <Plus size={16} />
-            </button>
-          </div>
-          {files.length > 0 ? files.map((file) => (
-            <button
-              type="button"
-              className={`dataset-row dataset-row-selectable${file.id === selectedFile?.id ? ' dataset-row-active' : ''}`}
-              key={file.id}
-              onClick={() => setSelectedFileId(file.id)}
-            >
-              <div>
-                <strong>{file.name}</strong>
-                <span>
-                  {file.rows.length.toLocaleString('en-US')} filas · {file.headers.length} columnas · {formatSize(file.sizeKB)} · {file.isClean ? 'limpio' : 'pendiente'}
-                </span>
-              </div>
-              <div className="dataset-row-actions">
-                {file.isClean ? <CheckCircle2 size={18} className="status-success" /> : <AlertCircle size={18} className="status-warning" />}
-                <Trash2
-                  size={16}
-                  className="dataset-delete-icon"
-                  aria-label={`Eliminar ${file.name}`}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!window.confirm(`¿Eliminar el archivo "${file.name}"?`)) return;
-                    try {
-                      await eliminarCsv(file.id);
-                      removeFile(file.id);
-                      if (selectedFile?.id === file.id) setSelectedFileId(null);
-                    } catch (err) {
-                      window.alert(err instanceof Error ? err.message : 'No se pudo eliminar el archivo en el servidor.');
-                    }
-                  }}
-                />
-              </div>
-            </button>
-          )) : <ChartEmpty message="Aún no hay archivos cargados." compact />}
-        </section>
-      </div>
-
-      <section className="dashboard-card participation-card">
-        <div className="card-heading">
+        .dataset-group-empty {
+          font-size: 0.82rem;
+          color: #94a3b8;
+          padding: 0.5rem 0;
+        }
+      `}</style>
+      <div className="dashboard-page home-dashboard">
+        <div className="dashboard-heading">
           <div>
-            <h3>Estructura del dataset</h3>
-            <p>Detalle por columna del archivo seleccionado.</p>
+            <p className="eyebrow">Resumen del espacio de trabajo</p>
+            <h2>Inicio</h2>
+            <p>Una vista rápida de tus datasets cargados.</p>
           </div>
+          <div className="dashboard-date">Actualizado hoy</div>
         </div>
-        {estructura.length > 0 ? (
-          <div className="estructura-table-wrapper">
-            <table className="estructura-table">
-              <thead>
-                <tr>
-                  <th>Columna</th>
-                  <th>Tipo</th>
-                  <th>Mín.</th>
-                  <th>Máx.</th>
-                  <th>Media</th>
-                  <th>Mediana</th>
-                </tr>
-              </thead>
-              <tbody>
-                {estructura.map((col) => (
-                  <tr key={col.columna}>
-                    <td>{col.columna}</td>
-                    <td>{col.tipo}</td>
-                    <td>{col.min}</td>
-                    <td>{col.max}</td>
-                    <td>{col.media}</td>
-                    <td>{col.mediana}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+        {loadingFiles && <div className="alert-success">Cargando tus CSVs guardados...</div>}
+        {loadError && <div className="alert-error">{loadError}</div>}
+        {isUploading && <div className="alert-success">Subiendo CSV...</div>}
+        {uploadError && <div className="alert-error">{uploadError}</div>}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          onChange={handleFileSelected}
+          style={{ display: 'none' }}
+        />
+
+        <div className="dashboard-kpis">
+          <MetricCard icon={Database} label="Datasets cargados" value={files.length.toString()} accent />
+          <MetricCard icon={FileSpreadsheet} label="Propios" value={propios.length.toString()} />
+          <MetricCard icon={FileSpreadsheet} label="Otros" value={otros.length.toString()} />
+          <MetricCard icon={AlertCircle} label="Pendientes de limpiar" value={pendientes.length.toString()} />
+        </div>
+
+        <div className="dashboard-main-grid">
+          <section className="dashboard-card chart-card">
+            <div className="card-heading">
+              <div>
+                <h3>Tipos de dato por columna</h3>
+                <p>Estructura del dataset seleccionado.</p>
+              </div>
+              <BarChart3 size={20} aria-hidden="true" />
+            </div>
+            {tiposData.length > 0 ? (
+              <div className="type-chart-body">
+                <div className="type-chart-visual" aria-label="Distribución de tipos de dato">
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie data={tiposData} dataKey="count" nameKey="tipo" innerRadius={38} outerRadius={58} paddingAngle={2}>
+                        {tiposData.map((item, index) => <Cell key={item.tipo} fill={COLORS[index % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={(value, name) => [`${value} columna(s)`, name]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="type-chart-legend">
+                  {tiposData.map((item, index) => (
+                    <div className="type-chart-legend-item" key={item.tipo}>
+                      <span className="legend-dot" style={{ background: COLORS[index % COLORS.length] }} />
+                      <span>{item.tipo}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : <ChartEmpty message="Carga un CSV para ver su estructura." />}
+          </section>
+
+          <section className="dashboard-card dataset-card">
+            <div className="card-heading">
+              <div>
+                <h3>Datasets</h3>
+                <p>Selecciona uno para ver su detalle.</p>
+              </div>
+            </div>
+
+            <DatasetGroup
+              title="Datasets propios"
+              icon={User}
+              files={propios}
+              selectedFileId={selectedFile?.id}
+              onSelect={setSelectedFileId}
+              onDelete={handleDeleteFile}
+              onUpload={() => handleUploadClick('propio')}
+              emptyMessage="Aún no subiste ningún CSV propio."
+            />
+
+            <DatasetGroup
+              title="Otros datasets"
+              icon={Building2}
+              files={otros}
+              selectedFileId={selectedFile?.id}
+              onSelect={setSelectedFileId}
+              onDelete={handleDeleteFile}
+              onUpload={() => handleUploadClick('otro')}
+              emptyMessage="Aún no subiste CSVs de otros orígenes."
+            />
+          </section>
+        </div>
+
+        <section className="dashboard-card participation-card">
+          <div className="card-heading">
+            <div>
+              <h3>Estructura del dataset</h3>
+              <p>Detalle por columna del archivo seleccionado.</p>
+            </div>
           </div>
-        ) : <ChartEmpty message="Selecciona un dataset para ver su estructura." />}
-      </section>
+          {estructura.length > 0 ? (
+            <div className="estructura-table-wrapper">
+              <table className="estructura-table">
+                <thead>
+                  <tr>
+                    <th>Columna</th>
+                    <th>Tipo</th>
+                    <th>Mín.</th>
+                    <th>Máx.</th>
+                    <th>Media</th>
+                    <th>Mediana</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {estructura.map((col) => (
+                    <tr key={col.columna}>
+                      <td>{col.columna}</td>
+                      <td>{col.tipo}</td>
+                      <td>{col.min}</td>
+                      <td>{col.max}</td>
+                      <td>{col.media}</td>
+                      <td>{col.mediana}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <ChartEmpty message="Selecciona un dataset para ver su estructura." />}
+        </section>
+      </div>
+    </>
+  );
+}
+
+interface DatasetGroupProps {
+  title: string;
+  icon: typeof User;
+  files: CsvFile[];
+  selectedFileId?: string;
+  onSelect: (id: string) => void;
+  onDelete: (file: CsvFile) => void;
+  onUpload: () => void;
+  emptyMessage: string;
+}
+
+function DatasetGroup({ title, icon: Icon, files, selectedFileId, onSelect, onDelete, onUpload, emptyMessage }: DatasetGroupProps) {
+  return (
+    <div className="dataset-group">
+      <div className="dataset-group-heading">
+        <Icon size={14} />
+        <span>{title}</span>
+        <span className="dataset-group-count">{files.length}</span>
+        <button type="button" className="dataset-group-add" aria-label={`Agregar a ${title}`} title="Subir CSV aquí" onClick={onUpload}>
+          <Plus size={14} />
+        </button>
+      </div>
+
+      {files.length === 0 ? (
+        <p className="dataset-group-empty">{emptyMessage}</p>
+      ) : (
+        files.map((file) => (
+          <DatasetRow
+            key={file.id}
+            file={file}
+            isActive={file.id === selectedFileId}
+            onSelect={() => onSelect(file.id)}
+            onDelete={() => onDelete(file)}
+          />
+        ))
+      )}
     </div>
+  );
+}
+
+interface DatasetRowProps {
+  file: CsvFile;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}
+
+function DatasetRow({ file, isActive, onSelect, onDelete }: DatasetRowProps) {
+  return (
+    <button
+      type="button"
+      className={`dataset-row dataset-row-selectable${isActive ? ' dataset-row-active' : ''}`}
+      onClick={onSelect}
+    >
+      <div>
+        <strong>{file.name}</strong>
+        <span>
+          {file.rows.length.toLocaleString('en-US')} filas · {file.headers.length} columnas · {formatSize(file.sizeKB)} · {file.isClean ? 'limpio' : 'pendiente'}
+        </span>
+      </div>
+      <div className="dataset-row-actions">
+        {file.isClean ? <CheckCircle2 size={18} className="status-success" /> : <AlertCircle size={18} className="status-warning" />}
+        <Trash2
+          size={16}
+          className="dataset-delete-icon"
+          aria-label={`Eliminar ${file.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        />
+      </div>
+    </button>
   );
 }
 

@@ -481,6 +481,39 @@ nav {
   flex-shrink: 0;
 }
 
+.type-chart-body {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.type-chart-visual {
+  width: 150px;
+  height: 150px;
+  flex: 0 0 150px;
+}
+
+.type-chart-legend {
+  display: grid;
+  flex: 1;
+  gap: 0.65rem;
+}
+
+.type-chart-legend-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.type-chart-legend-item strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
 .dataset-row {
   display: flex;
   align-items: center;
@@ -592,6 +625,8 @@ nav {
   .dashboard-kpis { grid-template-columns: 1fr; }
   .participation-layout { flex-direction: column; }
   .participation-layout > div { width: 100% !important; }
+  .type-chart-body { align-items: stretch; flex-direction: column; }
+  .type-chart-visual { align-self: center; }
 }
 
 /* Componentes de Procesar CSV */
