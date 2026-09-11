@@ -5,6 +5,7 @@ import {
   ClipboardList,
   FileSpreadsheet,
   Home,
+  MessageSquareText,
   TrendingUp,
   Upload,
   Users,
@@ -27,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp, roles: ['ANALISTA'] },
   { to: '/dashboard/reportes', label: 'Reportes', icon: BarChart3, roles: ['ANALISTA', 'TRABAJADOR'] },
   { to: '/dashboard/tareas', label: 'Tareas', icon: ClipboardList, roles: ['ANALISTA', 'TRABAJADOR'] },
+  { to: '/dashboard/solicitudes', label: 'Solicitudes', icon: MessageSquareText, roles: ['ANALISTA'] },
   { to: '/dashboard/inteligencia', label: 'Negocio/Inteligencia', icon: BrainCircuit, roles: ['TRABAJADOR'] },
   { to: '/dashboard/trabajadores', label: 'Equipo', icon: Users, roles: ['ANALISTA'] },
 ];

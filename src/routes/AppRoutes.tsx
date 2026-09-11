@@ -18,7 +18,7 @@ const Procesar = lazy(() => import('../pages/dashboard/proceso/Procesar'));
 const LimpiarDatos = lazy(() => import('../pages/dashboard/LimpiarDatos'));
 const Reportes = lazy(() => import('../pages/dashboard/Reportes'));
 const Inteligencia = lazy(() => import('../pages/dashboard/Inteligencia'));
-const CrearTrabajador = lazy(() => import('../pages/dashboard/CrearTrabajador'));
+const Solicitudes = lazy(() => import('../pages/dashboard/Solicitudes'));
 const Tareas = lazy(() => import('../pages/dashboard/Tareas'));
 
 function AppRoutes() {
@@ -44,7 +44,7 @@ function AppRoutes() {
           <Route path="reportes" element={<Reportes />} />
           <Route path="tareas" element={<RequireRole allowed={['ANALISTA', 'TRABAJADOR']}><Tareas /></RequireRole>} />
           <Route path="inteligencia" element={<RequireRole allowed={['TRABAJADOR']}><Inteligencia /></RequireRole>} />
-          <Route path="trabajadores" element={<RequireRole allowed={['ANALISTA']}><CrearTrabajador /></RequireRole>} />
+          <Route path="solicitudes" element={<RequireRole allowed={['ANALISTA']}><Solicitudes /></RequireRole>} />
         </Route>
       </Routes>
     </Suspense>
