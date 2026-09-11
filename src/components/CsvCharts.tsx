@@ -6,10 +6,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
-  Legend,
 } from 'recharts';
 import { Check } from 'lucide-react';
 
@@ -26,11 +23,6 @@ interface CsvChartsProps {
 interface NumericColumn {
   name: string;
   promedio: number;
-}
-
-interface CategoryValue {
-  name: string;
-  cantidad: number;
 }
 
 function isNullValue(value: string): boolean {
@@ -62,21 +54,6 @@ function CsvCharts({
    * 1. GRÁFICO DE CALIDAD DEL CSV
    * =========================================================
    */
-
-  const qualityData = [
-    {
-      name: 'Vacíos',
-      cantidad: summary.emptyValues,
-    },
-    {
-      name: 'Nulos',
-      cantidad: summary.nullValues,
-    },
-    {
-      name: 'Duplicados',
-      cantidad: summary.removedDuplicates,
-    },
-  ];
 
   /*
    * =========================================================
@@ -140,113 +117,16 @@ function CsvCharts({
         column !== null
     );
 
-  /*
-   * Limitamos a 10 columnas para mantener
-   * el gráfico visualmente limpio.
-   */
-
-  const numericChartData =
-    numericColumns.slice(0, 10);
-
-  /*
-   * =========================================================
-   * 3. DETECTAR COLUMNA CATEGÓRICA
-   * =========================================================
-   */
-
-  let categoryData: CategoryValue[] = [];
-
-  const categoricalColumn =
-    headers.findIndex(
-      (_, columnIndex) => {
-
-        const values = rows
-          .map(
-            (row) =>
-              row[columnIndex] ?? ''
-          )
-          .filter(
-            (value) =>
-              value.trim() !== '' &&
-              !isNullValue(value)
-          );
-
-        if (values.length === 0) {
-          return false;
-        }
-
-        const numericCount =
-          values.filter(isNumeric).length;
-
-        return (
-          numericCount / values.length <
-          0.7
-        );
-      }
-    );
-
-  /*
-   * Contamos las categorías.
-   */
-
-  if (categoricalColumn !== -1) {
-
-    const counter =
-      new Map<string, number>();
-
-    rows.forEach((row) => {
-
-      const value =
-        (
-          row[categoricalColumn] ?? ''
-        ).trim();
-
-      if (
-        !value ||
-        isNullValue(value)
-      ) {
-        return;
-      }
-
-      counter.set(
-        value,
-        (counter.get(value) ?? 0) + 1
-      );
-    });
-
-    categoryData =
-      Array.from(
-        counter.entries()
-      )
-        .map(
-          ([name, cantidad]) => ({
-            name,
-            cantidad,
-          })
-        )
-        .sort(
-          (a, b) =>
-            b.cantidad - a.cantidad
-        )
-        .slice(0, 8);
-  }
-
-  /*
-   * =========================================================
-   * 4. COLORES DEL GRÁFICO CIRCULAR
-   * =========================================================
-   */
-
-  const COLORS = [
-    '#6366f1',
-    '#06b6d4',
-    '#22c55e',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
+  const totalCells = rows.length * headers.length;
+  const validCells = Math.max(totalCells - summary.emptyValues - summary.nullValues, 0);
+  const qualityData = [
+    { name: 'Celdas válidas', cantidad: validCells, color: '#0f766e' },
+    { name: 'Celdas vacías', cantidad: summary.emptyValues, color: '#d97706' },
+    { name: 'Valores nulos', cantidad: summary.nullValues, color: '#dc2626' },
+    { name: 'Duplicados', cantidad: summary.removedDuplicates, color: '#64748b' },
   ];
+
+  const numericChartData = numericColumns.slice(0, 10);
 
   /*
    * =========================================================
@@ -337,25 +217,9 @@ function CsvCharts({
                   stroke="#e5e7eb"
                 />
 
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{
-                    fontSize: 12,
-                    fill: '#6b7280',
-                  }}
-                />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
 
-                <YAxis
-                  allowDecimals={false}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{
-                    fontSize: 12,
-                    fill: '#6b7280',
-                  }}
-                />
+                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tickFormatter={(value) => Number(value).toLocaleString('es-PE')} tick={{ fontSize: 12, fill: '#6b7280' }} />
 
                 <Tooltip
                   cursor={{
@@ -370,18 +234,9 @@ function CsvCharts({
                   }}
                 />
 
-                <Bar
-                  dataKey="cantidad"
-                  name="Cantidad"
-                  fill="#6366f1"
-                  radius={[
-                    6,
-                    6,
-                    0,
-                    0,
-                  ]}
-                  barSize={42}
-                />
+                <Bar dataKey="cantidad" name="Cantidad" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={42}>
+                  {qualityData.map((item) => <Cell key={item.name} fill={item.color} />)}
+                </Bar>
 
               </BarChart>
 
@@ -429,15 +284,7 @@ function CsvCharts({
                 height="100%"
               >
 
-                <BarChart
-                  data={numericChartData}
-                  margin={{
-                    top: 15,
-                    right: 10,
-                    left: -15,
-                    bottom: 35,
-                  }}
-                >
+                <BarChart layout="vertical" data={numericChartData} margin={{ top: 15, right: 10, left: 10, bottom: 5 }}>
 
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -445,26 +292,9 @@ function CsvCharts({
                     stroke="#e5e7eb"
                   />
 
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    angle={-20}
-                    textAnchor="end"
-                    tick={{
-                      fontSize: 11,
-                      fill: '#6b7280',
-                    }}
-                  />
+                  <XAxis type="number" axisLine={false} tickLine={false} tickFormatter={(value) => Number(value).toLocaleString('es-PE')} tick={{ fontSize: 11, fill: '#6b7280' }} />
 
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{
-                      fontSize: 12,
-                      fill: '#6b7280',
-                    }}
-                  />
+                  <YAxis type="category" dataKey="name" width={110} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
 
                   <Tooltip
                     cursor={{
@@ -479,18 +309,7 @@ function CsvCharts({
                     }}
                   />
 
-                  <Bar
-                    dataKey="promedio"
-                    name="Promedio"
-                    fill="#06b6d4"
-                    radius={[
-                      6,
-                      6,
-                      0,
-                      0,
-                    ]}
-                    barSize={40}
-                  />
+                  <Bar dataKey="promedio" name="Promedio" fill="#0891b2" radius={[0, 6, 6, 0]} barSize={32} />
 
                 </BarChart>
 
@@ -502,109 +321,6 @@ function CsvCharts({
 
         )}
 
-
-        {/* ===================================================
-            GRÁFICO CATEGÓRICO
-        =================================================== */}
-
-        {categoryData.length > 0 && (
-
-          <article className="chart-card chart-card-wide">
-
-            <div className="chart-card-header">
-
-              <div>
-
-                <h3>
-                  Distribución de categorías
-                </h3>
-
-                <p>
-                  Valores más frecuentes
-                  encontrados en el archivo.
-                </p>
-
-              </div>
-
-              <div className="chart-icon category-icon">
-                %
-              </div>
-
-            </div>
-
-
-            <div className="chart-container pie-container">
-
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-
-                <PieChart>
-
-                  <Pie
-                    data={categoryData}
-                    dataKey="cantidad"
-                    nameKey="name"
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={65}
-                    outerRadius={105}
-                    paddingAngle={3}
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                  >
-
-                    {categoryData.map(
-                      (_, index) => (
-
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={
-                            COLORS[
-                              index %
-                              COLORS.length
-                            ]
-                          }
-                        />
-
-                      )
-                    )}
-
-                  </Pie>
-
-
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '10px',
-                      border:
-                        '1px solid #e5e7eb',
-                      boxShadow:
-                        '0 8px 24px rgba(0,0,0,0.08)',
-                      fontSize: '13px',
-                    }}
-                  />
-
-
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    iconType="circle"
-                    wrapperStyle={{
-                      fontSize: '12px',
-                      color: '#4b5563',
-                    }}
-                  />
-
-                </PieChart>
-
-              </ResponsiveContainer>
-
-            </div>
-
-          </article>
-
-        )}
 
       </div>
 

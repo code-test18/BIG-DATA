@@ -30,10 +30,10 @@ import {
 } from 'recharts';
 import type { DashboardContextType } from '../../types/csv';
 
-import type { MetricasVentas, PuntoParticipacion, VentaReporte } from '../../types/ventas';
+import type { MetricasVentas, VentaReporte } from '../../types/ventas';
 import { eliminarReporte, obtenerReportes } from '../../utils/reportesStorage';
 
-const COLORES_PASTEL = ['#2563eb', '#60a5fa', '#93c5fd', '#d946ef', '#e879f9', '#f0abfc'];
+const COLORES_PASTEL = ['#2563eb', '#0f766e', '#d97706', '#64748b', '#0891b2', '#475569'];
 
 export default function Reportes() {
   const { activeFileId } = useOutletContext<DashboardContextType>();
@@ -161,7 +161,7 @@ export default function Reportes() {
           <div>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingreso Total</span>
             <div style={{ marginTop: '0.35rem', fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>
-              ${m.ingresoTotal?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+              S/ {m.ingresoTotal?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
             </div>
           </div>
           <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -173,7 +173,7 @@ export default function Reportes() {
           <div>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticket Promedio</span>
             <div style={{ marginTop: '0.35rem', fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>
-              ${m.ticketPromedio?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+              S/ {m.ticketPromedio?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
             </div>
           </div>
           <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -350,7 +350,7 @@ export default function Reportes() {
             {renderMetricas(reporteActual)}
 
             {/* GRÁFICOS GUARDADOS DEL REPORTE */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
               {/* Gráfico de Pastel (Participación) */}
               {reporteActual.participacionCategoria && reporteActual.participacionCategoria.length > 0 && (
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
@@ -358,7 +358,7 @@ export default function Reportes() {
                     <PieIcon size={18} color="#4f46e5" />
                     <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a' }}>Participación por Categoría</h4>
                   </div>
-                  <div style={{ height: '240px', width: '100%' }}>
+                  <div style={{ height: '300px', width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -367,15 +367,11 @@ export default function Reportes() {
                           nameKey="categoria"
                           cx="50%"
                           cy="50%"
-                          innerRadius={45}
-                          outerRadius={80}
+                          innerRadius={68}
+                          outerRadius={112}
                           paddingAngle={3}
                           stroke="#ffffff"
                           strokeWidth={2}
-                          label={(entry) => {
-                            const punto = entry as unknown as PuntoParticipacion;
-                            return `${punto.categoria}: ${punto.porcentaje.toFixed(1)}%`;
-                          }}
                         >
                           {reporteActual.participacionCategoria.map((_, index) => (
                             <Cell key={`pie-${index}`} fill={COLORES_PASTEL[index % COLORES_PASTEL.length]} />
@@ -401,14 +397,14 @@ export default function Reportes() {
                     <BarChart3 size={18} color="#2563eb" />
                     <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a' }}>Ingreso por Categoría</h4>
                   </div>
-                  <div style={{ height: '240px', width: '100%' }}>
+                  <div style={{ height: '320px', width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={reporteActual.graficoPorCategoria} margin={{ top: 5, right: 5, left: -10, bottom: 20 }}>
+                      <BarChart layout="vertical" data={reporteActual.graficoPorCategoria} margin={{ top: 8, right: 18, left: 20, bottom: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `$${val}`} />
-                        <Tooltip formatter={(value: unknown) => [`$${Number(value ?? 0).toLocaleString()}`, 'Total']} />
-                        <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                        <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `S/ ${val}`} />
+                        <YAxis type="category" dataKey="label" width={105} tick={{ fontSize: 10, fill: '#64748b' }} />
+                        <Tooltip formatter={(value: unknown) => [`S/ ${Number(value ?? 0).toLocaleString('es-PE')}`, 'Ingreso total']} />
+                        <Bar dataKey="total" fill="#2563eb" radius={[0, 5, 5, 0]}>
                           {reporteActual.graficoPorCategoria.map((_, index) => (
                             <Cell key={`bar-${index}`} fill={COLORES_PASTEL[index % COLORES_PASTEL.length]} />
                           ))}
@@ -426,14 +422,14 @@ export default function Reportes() {
                     <TrendingUp size={18} color="#06b6d4" />
                     <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a' }}>Tendencia en el Tiempo</h4>
                   </div>
-                  <div style={{ height: '240px', width: '100%' }}>
+                  <div style={{ height: '300px', width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={reporteActual.graficoPorFecha} margin={{ top: 5, right: 5, left: -10, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `$${val}`} />
-                        <Tooltip formatter={(value: unknown) => [`$${Number(value ?? 0).toLocaleString()}`, 'Total']} />
-                        <Line type="monotone" dataKey="total" stroke="#06b6d4" strokeWidth={2.5} dot={{ r: 3 }} />
+                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `S/ ${val}`} />
+                        <Tooltip formatter={(value: unknown) => [`S/ ${Number(value ?? 0).toLocaleString('es-PE')}`, 'Ingreso total']} />
+                        <Line type="monotone" dataKey="total" stroke="#0f766e" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -448,14 +444,14 @@ export default function Reportes() {
                     <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a' }}>Unidades por Categoría</h4>
                   </div>
 
-                  <div style={{ height: '240px', width: '100%' }}>
+                  <div style={{ height: '320px', width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={reporteActual.graficoUnidadesPorCategoria}>
+                      <BarChart layout="vertical" data={reporteActual.graficoUnidadesPorCategoria} margin={{ top: 8, right: 18, left: 20, bottom: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="label" />
-                        <YAxis />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="label" width={105} />
                         <Tooltip formatter={(value: unknown) => [Number(value ?? 0).toLocaleString(), 'Unidades']} />
-                        <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total" fill="#0f766e" radius={[0, 5, 5, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -494,8 +490,8 @@ function ReporteGraficos({ reporte }: { reporte: VentaReporte }) {
   const names = reporte.nombresDatasets ?? { a: 'Dataset A', b: 'Dataset B' };
   return <div style={{ display: 'grid', gap: '1.5rem', marginTop: '1.5rem' }}>
     <h4 style={{ margin: 0, color: '#0f172a' }}>Gráficos y comparativas</h4>
-    {tendencia?.length ? <div style={chartBox}><h5 style={chartTitle}>Evolución de ingresos</h5><ResponsiveContainer width="100%" height={260}><LineChart data={tendencia}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" /><YAxis /><Tooltip /><Legend /><Line name={names.a} dataKey="datasetA" stroke="#2563eb" strokeWidth={2.5} /><Line name={names.b} dataKey="datasetB" stroke="#d946ef" strokeWidth={2.5} /></LineChart></ResponsiveContainer></div> : null}
-    {comparativa?.length ? <div style={chartBox}><h5 style={chartTitle}>Ingresos por categoría</h5><ResponsiveContainer width="100%" height={260}><BarChart data={comparativa}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" /><YAxis /><Tooltip /><Legend /><Bar name={names.a} dataKey="datasetA" fill="#2563eb" /><Bar name={names.b} dataKey="datasetB" fill="#d946ef" /></BarChart></ResponsiveContainer></div> : null}
+    {tendencia?.length ? <div style={chartBox}><h5 style={chartTitle}>Evolución de ingresos</h5><ResponsiveContainer width="100%" height={300}><LineChart data={tendencia}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" /><YAxis tickFormatter={(value) => `S/ ${value}`} /><Tooltip formatter={(value: unknown) => `S/ ${Number(value ?? 0).toLocaleString('es-PE')}`} /><Legend /><Line name={names.a} dataKey="datasetA" stroke="#2563eb" strokeWidth={3} dot={false} activeDot={{ r: 5 }} /><Line name={names.b} dataKey="datasetB" stroke="#0f766e" strokeWidth={3} dot={false} activeDot={{ r: 5 }} /></LineChart></ResponsiveContainer></div> : null}
+    {comparativa?.length ? <div style={chartBox}><h5 style={chartTitle}>Ingresos por categoría</h5><ResponsiveContainer width="100%" height={320}><BarChart layout="vertical" data={comparativa} margin={{ left: 20, right: 16 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis type="number" tickFormatter={(value) => `S/ ${value}`} /><YAxis type="category" dataKey="label" width={100} /><Tooltip formatter={(value: unknown) => `S/ ${Number(value ?? 0).toLocaleString('es-PE')}`} /><Legend /><Bar name={names.a} dataKey="datasetA" fill="#2563eb" radius={[0, 5, 5, 0]} /><Bar name={names.b} dataKey="datasetB" fill="#0f766e" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div> : null}
     {reporte.participacionCategoriaA?.length || reporte.participacionCategoriaB?.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}><PieReport title={names.a} data={reporte.participacionCategoriaA ?? []} color="#2563eb" /><PieReport title={names.b} data={reporte.participacionCategoriaB ?? []} color="#d946ef" /></div> : null}
     {reporte.productosDatasetA?.length || reporte.productosDatasetB?.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}><ProductReport title={names.a} products={reporte.productosDatasetA ?? []} color="#2563eb" /><ProductReport title={names.b} products={reporte.productosDatasetB ?? []} color="#d946ef" /></div> : null}
   </div>;

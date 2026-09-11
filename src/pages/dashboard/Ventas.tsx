@@ -4,7 +4,6 @@ import {
   Check,
   DollarSign,
   Package,
-  PieChart as PieIcon,
   Receipt,
   Save,
   TrendingUp,
@@ -16,7 +15,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   Line,
   LineChart,
   Pie,
@@ -27,21 +25,17 @@ import {
   YAxis,
 } from 'recharts';
 import type { DashboardContextType } from '../../types/csv';
-import type { PuntoParticipacion, VentasSelection, VentaReporte } from '../../types/ventas';
+import type { VentasSelection, VentaReporte } from '../../types/ventas';
 import { calcularMetricasVentas, type ResultadoCalculoVentas } from '../../utils/calcularMetricasVentas';
 import { guardarReporte } from '../../utils/reportesStorage';
 
 const COLORES_PASTEL = [
-  '#6366f1',
-  '#06b6d4',
-  '#10b981',
-  '#f59e0b',
-  '#ec4899',
-  '#8b5cf6',
-  '#3b82f6',
-  '#14b8a6',
-  '#f43f5e',
-  '#84cc16',
+  '#2563eb',
+  '#0f766e',
+  '#d97706',
+  '#64748b',
+  '#0891b2',
+  '#475569',
 ];
 
 function Ventas() {
@@ -239,7 +233,7 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
           <div>
             <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingreso Total</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.6rem', fontWeight: 700, color: '#0f172a' }}>
-              ${metricas.ingresoTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              S/ {metricas.ingresoTotal.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
           </div>
           <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -251,7 +245,7 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
           <div>
             <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticket Promedio</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.6rem', fontWeight: 700, color: '#0f172a' }}>
-              ${metricas.ticketPromedio.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              S/ {metricas.ticketPromedio.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
           </div>
           <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -301,21 +295,21 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
       {/* GRID DE GRÁFICOS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
         
-        {/* GRÁFICO DE PASTEL / DONA: PARTICIPACIÓN POR CATEGORÍA */}
+        {/* DONA: PARTICIPACIÓN POR CATEGORÍA */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <PieIcon size={18} strokeWidth={2.2} />
+                <BarChart3 size={18} strokeWidth={2.2} />
               </div>
               <div>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Participación por Categoría</h4>
-                <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>Distribución porcentual de ingresos (Gráfico Pastel)</p>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Participación por categoría</h4>
+                <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>Participación del ingreso por categoría</p>
               </div>
             </div>
           </div>
 
-          <div style={{ height: '280px', width: '100%' }}>
+          <div style={{ height: '320px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -324,38 +318,19 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
                   nameKey="categoria"
                   cx="50%"
                   cy="50%"
-                  innerRadius={55}
-                  outerRadius={100}
-                  paddingAngle={3}
+                  innerRadius={72}
+                  outerRadius={118}
+                  paddingAngle={2}
                   stroke="#ffffff"
                   strokeWidth={2}
-                  label={(entry) => {
-                    const punto = entry as unknown as PuntoParticipacion;
-                    return `${punto.categoria} (${punto.porcentaje.toFixed(1)}%)`;
-                  }}
                 >
-                  {participacionCategoria.map((_, index) => (
-                    <Cell key={index} fill={COLORES_PASTEL[index % COLORES_PASTEL.length]} />
+                  {participacionCategoria.map((item, index) => (
+                    <Cell key={item.categoria} fill={COLORES_PASTEL[index % COLORES_PASTEL.length]} />
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: unknown) => {
-                    const numeric = Number(value ?? 0);
-                    return [`${numeric.toFixed(1)}%`, 'Participación'];
-                  }}
-                  contentStyle={{
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08)',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                  }}
-                />
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '12px', color: '#475569', paddingTop: '10px' }}
+                  formatter={(value: unknown) => [`${Number(value ?? 0).toFixed(1)}%`, 'Participación']}
+                  contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px' }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -403,14 +378,14 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
 
           <div style={{ height: '340px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={graficoPorCategoria} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
+                <BarChart layout="vertical" data={graficoPorCategoria} margin={{ top: 8, right: 18, left: 20, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(val) => `$${val}`} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(val) => `S/ ${val}`} />
+                  <YAxis type="category" dataKey="label" width={120} tick={{ fontSize: 12, fill: '#64748b' }} />
                 <Tooltip
                   formatter={(value: unknown) => {
                     const numeric = Number(value ?? 0);
-                    return [`$${numeric.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'Total Ingreso'];
+                    return [`S/ ${numeric.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`, 'Ingreso total'];
                   }}
                   contentStyle={{
                     borderRadius: '10px',
@@ -430,7 +405,7 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
         </div>
 
         {/* GRÁFICO DE LÍNEA: TENDENCIA EN EL TIEMPO */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div style={{ gridColumn: '1 / -1', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#cffafe', color: '#0891b2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -443,16 +418,16 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
             </div>
           </div>
 
-          <div style={{ height: '300px', width: '100%' }}>
+          <div style={{ height: '320px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={graficoPorFecha} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
+                <LineChart data={graficoPorFecha} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(val) => `$${val}`} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(val) => `S/ ${val}`} />
                 <Tooltip
                   formatter={(value: unknown) => {
                     const numeric = Number(value ?? 0);
-                    return [`$${numeric.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'Total Ingreso'];
+                    return [`S/ ${numeric.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`, 'Ingreso total'];
                   }}
                   contentStyle={{
                     borderRadius: '10px',
@@ -466,8 +441,8 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
                   dataKey="total"
                   stroke="#06b6d4"
                   strokeWidth={3}
-                  dot={{ r: 4, fill: '#06b6d4' }}
-                  activeDot={{ r: 7 }}
+                  dot={false}
+                  activeDot={{ r: 5 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -489,12 +464,12 @@ function ResultadoVentas({ resultado, onGuardar, guardado }: ResultadoVentasProp
               </div>
             </div>
 
-            <div style={{ height: '300px', width: '100%' }}>
+            <div style={{ height: '320px', width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={graficoUnidadesPorCategoria} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
+                <BarChart layout="vertical" data={graficoUnidadesPorCategoria} margin={{ top: 8, right: 18, left: 20, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <YAxis type="category" dataKey="label" width={120} tick={{ fontSize: 12, fill: '#64748b' }} />
                   <Tooltip
                     formatter={(value: unknown) => {
                       const numeric = Number(value ?? 0);

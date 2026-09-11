@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { DatasetMetrics, ParsedDataset, DatasetComparison, ComparisonRow } from './ProcesarTypes';
+import type { DatasetMetrics, ParsedDataset, DatasetComparison, ComparisonRow, ColumnMapping } from './ProcesarTypes';
 
 const EMPTY_METRICS: DatasetMetrics = {
   totalIngresos: 0,
@@ -15,11 +15,6 @@ const EMPTY_METRICS: DatasetMetrics = {
   canalVentaStats: {},
 };
 
-const parseMetric = (value: unknown, fallback = 0): number => {
-  const parsed = normalizeNumber(String(value ?? ''));
-  return parsed ?? fallback;
-};
-
 const getMonthKey = (value: unknown): string => {
   const rawDate = String(value ?? '').trim();
   if (!rawDate) return '';
@@ -31,11 +26,62 @@ const getMonthKey = (value: unknown): string => {
   return dayFirstMatch ? `${dayFirstMatch[3]}-${dayFirstMatch[2].padStart(2, '0')}` : rawDate.slice(0, 7);
 };
 
-export const processDataset = (rows: string[][], headers: string[]): DatasetMetrics => {
+export const normalizeNumber = (value: string): number | null => {
+  if (!value) return null;
+  const cleaned = value.replace(/\s+/g, '').replace(/[^0-9,.-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === ',') return null;
+
+  const normalized = cleaned.includes(',') && cleaned.includes('.')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned.replace(',', '.');
+
+  const numericValue = Number(normalized);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const normalizeHeader = (header: string): string =>
+  header.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+export const inferColumnMapping = (headers: string[]): ColumnMapping => {
+  const normalizedHeaders = headers.map((header) => ({ original: header, normalized: normalizeHeader(header) }));
+  const findHeader = (aliases: string[]): string | null => {
+    const match = normalizedHeaders.find(({ normalized }) => aliases.includes(normalized));
+    return match?.original ?? null;
+  };
+
+  return {
+    ingreso: findHeader(['ingresototal', 'ingreso', 'ventas', 'venta', 'monto', 'importe']),
+    unidades: findHeader(['unidadesvendidas', 'unidades', 'cantidad']),
+    producto: findHeader(['producto', 'nombreproducto']),
+    categoria: findHeader(['categoria', 'tipoproducto']),
+    fecha: findHeader(['fecha', 'date']),
+    descuento: findHeader(['descuento', 'descuentoaplicado']),
+    canal: findHeader(['canal', 'canalventa']),
+  };
+};
+
+/**
+ * Calcula métricas de negocio a partir de un ColumnMapping confirmado por el usuario
+ * (ya no adivina nombres de columna en español fijo).
+ */
+export const processDataset = (rows: string[][], headers: string[], mapping: ColumnMapping): DatasetMetrics => {
   if (!rows.length) return { ...EMPTY_METRICS };
 
-  const columnIndex = new Map(headers.map((header, index) => [header.toLowerCase(), index]));
-  const read = (row: string[], column: string): string => row[columnIndex.get(column) ?? -1] ?? '';
+  const columnIndex = new Map(headers.map((header, index) => [header, index]));
+  const idx = (col: string | null) => (col ? columnIndex.get(col) : undefined);
+  const read = (row: string[], i: number | undefined): string => (i !== undefined ? row[i] ?? '' : '');
+
+  const ingresoIdx = idx(mapping.ingreso);
+  const unidadesIdx = idx(mapping.unidades);
+  const productoIdx = idx(mapping.producto);
+  const categoriaIdx = idx(mapping.categoria);
+  const fechaIdx = idx(mapping.fecha);
+  const descuentoIdx = idx(mapping.descuento);
+  const canalIdx = idx(mapping.canal);
+
+  const hasDescuentos = descuentoIdx !== undefined;
+  const hasCanalVenta = canalIdx !== undefined;
+
   const productMap: Record<string, { unidades: number; ingresos: number }> = {};
   const categories: Record<string, number> = {};
   const monthly: Record<string, number> = {};
@@ -44,19 +90,16 @@ export const processDataset = (rows: string[][], headers: string[]): DatasetMetr
   let totalUnidades = 0;
   let totalDescuentos = 0;
 
-  const hasDescuentos = columnIndex.has('descuento_aplicado');
-  const hasCanalVenta = columnIndex.has('canal_venta');
-
   rows.forEach((row) => {
-    const ingreso = parseMetric(read(row, 'ingreso_total'));
-    const unidades = parseMetric(read(row, 'unidades_vendidas'), 1);
-    const producto = read(row, 'producto').trim();
-    const categoria = read(row, 'categoria').trim();
-    const month = getMonthKey(read(row, 'fecha'));
+    const ingreso = normalizeNumber(read(row, ingresoIdx)) ?? 0;
+    const unidades = normalizeNumber(read(row, unidadesIdx)) ?? 1;
+    const producto = read(row, productoIdx).trim();
+    const categoria = read(row, categoriaIdx).trim();
+    const month = getMonthKey(read(row, fechaIdx));
 
     totalIngresos += ingreso;
     totalUnidades += unidades;
-    if (hasDescuentos) totalDescuentos += parseMetric(read(row, 'descuento_aplicado'));
+    if (hasDescuentos) totalDescuentos += normalizeNumber(read(row, descuentoIdx)) ?? 0;
 
     if (producto) {
       productMap[producto] ??= { unidades: 0, ingresos: 0 };
@@ -66,7 +109,7 @@ export const processDataset = (rows: string[][], headers: string[]): DatasetMetr
     if (categoria) categories[categoria] = (categories[categoria] ?? 0) + ingreso;
     if (month) monthly[month] = (monthly[month] ?? 0) + ingreso;
 
-    const canal = read(row, 'canal_venta').trim();
+    const canal = read(row, canalIdx).trim();
     if (hasCanalVenta && canal) canalVentaStats[canal] = (canalVentaStats[canal] ?? 0) + ingreso;
   });
 
@@ -88,21 +131,11 @@ export const processDataset = (rows: string[][], headers: string[]): DatasetMetr
   };
 };
 
-// Helper para detectar celdas consideradas como NULO (incluyendo limpiezas previas como N/A o 0 imputado)
 export const isNullValue = (value: string | number, isNumericColumn: boolean = false): boolean => {
   if (value === null || value === undefined) return true;
   const strVal = String(value).trim().toLowerCase();
-
-  // Marcas de texto comúnmente usadas como nulos
-  if (['', 'null', 'nil', 'none', 'n/a', 'na', 'nan', 'undefined', '-'].includes(strVal)) {
-    return true;
-  }
-
-  // En columnas numéricas, el '0' proviene de una imputación de nulo
-  if (isNumericColumn && strVal === '0') {
-    return true;
-  }
-
+  if (['', 'null', 'nil', 'none', 'n/a', 'na', 'nan', 'undefined', '-'].includes(strVal)) return true;
+  if (isNumericColumn && strVal === '0') return true;
   return false;
 };
 
@@ -116,35 +149,17 @@ export const parseCsvDataset = (file: File): Promise<ParsedDataset> =>
           reject(new Error('El CSV está vacío.'));
           return;
         }
-
         const headers = rawData[0].map((header) => String(header).trim()).filter(Boolean);
         if (headers.length === 0) {
           reject(new Error('El CSV no tiene columnas válidas.'));
           return;
         }
-
-        const rows = rawData.slice(1).map((row) =>
-          headers.map((_, index) => String(row[index] ?? '').trim())
-        );
-
+        const rows = rawData.slice(1).map((row) => headers.map((_, index) => String(row[index] ?? '').trim()));
         resolve({ name: file.name, headers, rows });
       },
       error: () => reject(new Error('No se pudo leer el CSV.')),
     });
   });
-
-export const normalizeNumber = (value: string): number | null => {
-  if (!value) return null;
-  const cleaned = value.replace(/\s+/g, '').replace(/[^0-9,.-]/g, '');
-  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === ',') return null;
-
-  const normalized = cleaned.includes(',') && cleaned.includes('.')
-    ? cleaned.replace(/\./g, '').replace(',', '.')
-    : cleaned.replace(',', '.');
-
-  const numericValue = Number(normalized);
-  return Number.isFinite(numericValue) ? numericValue : null;
-};
 
 export const inferTypeFromValues = (values: string[]): string => {
   const usableValues = values.filter((value) => !isNullValue(value));
@@ -164,19 +179,24 @@ export const inferTypeFromValues = (values: string[]): string => {
   return 'texto';
 };
 
-export const mean = (values: number[]): number => 
-  (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
+export const mean = (values: number[]): number =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
 export const formatMetric = (value: number): string => {
   if (!Number.isFinite(value)) return '0';
   return value % 1 === 0 ? String(value) : value.toFixed(2);
 };
 
+/**
+ * Comparación ESTRUCTURAL entre datasets (columnas, calidad, duplicados, volumen de filas).
+ * Ya NO intenta adivinar columnas de negocio por regex (ventas/género/categoría); el usuario
+ * confirma el ColumnMapping manualmente antes de calcular las métricas.
+ */
 export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedDataset): Promise<DatasetComparison> => {
   const sharedColumns = datasetA.headers.filter((header) => datasetB.headers.includes(header));
   const newColumnsInB = datasetB.headers.filter((header) => !datasetA.headers.includes(header));
   const missingInB = datasetA.headers.filter((header) => !datasetB.headers.includes(header));
-  
+
   const rowsA = datasetA.rows.length;
   const rowsB = datasetB.rows.length;
   const rowDifference = rowsB - rowsA;
@@ -184,15 +204,13 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
 
   const allColumns = Array.from(new Set([...datasetA.headers, ...datasetB.headers]));
 
-  // Cálculo de métricas de calidad y duplicados por dataset evaluando nulos limpios
   const getDatasetMetrics = (dataset: ParsedDataset) => {
     if (dataset.rows.length === 0) return { quality: 0, duplicates: 0, nullRate: 0 };
-    
+
     let nullishCells = 0;
     dataset.headers.forEach((_, colIndex) => {
       const sampleValues = dataset.rows.map((r) => r[colIndex] ?? '');
       const isNumeric = inferTypeFromValues(sampleValues) === 'numérico';
-
       sampleValues.forEach((val) => {
         if (isNullValue(val, isNumeric)) nullishCells++;
       });
@@ -200,14 +218,10 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
 
     const seenRows = new Set<string>();
     let duplicateRows = 0;
-
     dataset.rows.forEach((row) => {
       const rowKey = row.join('|');
-      if (seenRows.has(rowKey)) {
-        duplicateRows += 1;
-        return;
-      }
-      seenRows.add(rowKey);
+      if (seenRows.has(rowKey)) duplicateRows += 1;
+      else seenRows.add(rowKey);
     });
 
     const totalCells = (dataset.rows.length * dataset.headers.length) || 1;
@@ -237,28 +251,23 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
       const bColumnValues = inB ? datasetB.rows.map((row) => row[datasetB.headers.indexOf(column)] ?? '') : [];
 
       const isIgnoredForMedia = /id|identifier|code|codigo|date|fecha|time|hora/i.test(column);
-
       const typeA = inA ? (isIgnoredForMedia ? 'texto/fecha' : inferTypeFromValues(aColumnValues)) : '-';
       const typeB = inB ? (isIgnoredForMedia ? 'texto/fecha' : inferTypeFromValues(bColumnValues)) : '-';
 
       const isNumericA = typeA === 'numérico';
       const isNumericB = typeB === 'numérico';
 
-      // Filtrar ceros de imputación para no distorsionar las medias
       const numericA = aColumnValues
         .map((value) => normalizeNumber(value))
         .filter((value): value is number => value !== null && value !== 0);
-
       const numericB = bColumnValues
         .map((value) => normalizeNumber(value))
         .filter((value): value is number => value !== null && value !== 0);
 
       const canComputeMean = !isIgnoredForMedia && typeA !== 'fecha' && typeB !== 'fecha';
-
       const mediaA = numericA.length && canComputeMean ? mean(numericA) : 0;
       const mediaB = numericB.length && canComputeMean ? mean(numericB) : 0;
 
-      // Conteo preciso de nulos (incluyendo N/A y ceros imputados)
       const countNullsA = inA ? aColumnValues.filter((value) => isNullValue(value, isNumericA)).length : 0;
       const countNullsB = inB ? bColumnValues.filter((value) => isNullValue(value, isNumericB)).length : 0;
 
@@ -279,10 +288,9 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
     }
   }
 
-  // --- MOTOR DE INSIGHTS AVANZADOS ---
+  // Insights puramente estructurales; los de negocio se calculan sobre el mapping confirmado.
   const insights: string[] = [];
 
-  // 1. Variación de Registros/Filas
   if (rowDifference !== 0) {
     const direction = rowDifference > 0 ? 'incrementó' : 'redujo';
     insights.push(
@@ -292,7 +300,6 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
     insights.push(`**Volumen de datos:** Ambos datasets mantienen exactamente la misma cantidad de registros (${rowsA}).`);
   }
 
-  // 2. Estructura de Columnas
   if (newColumnsInB.length > 0) {
     insights.push(`**Nuevas columnas en B:** Se añadieron ${newColumnsInB.length} columna(s): \`${newColumnsInB.join(', ')}\`.`);
   }
@@ -300,64 +307,12 @@ export const buildComparison = async (datasetA: ParsedDataset, datasetB: ParsedD
     insights.push(`**Columnas eliminadas en B:** Desaparecieron ${missingInB.length} columna(s) presentes en A: \`${missingInB.join(', ')}\`.`);
   }
 
-  // 3. Insight Comercial: Análisis Financiero / Facturación Total
-  const salesColIndexA = datasetA.headers.findIndex((h) => /sales|total|income|revenue|ventas/i.test(h));
-  const salesColIndexB = datasetB.headers.findIndex((h) => /sales|total|income|revenue|ventas/i.test(h));
-
-  if (salesColIndexA !== -1 && salesColIndexB !== -1) {
-    const totalA = processDataset(datasetA.rows, datasetA.headers).totalIngresos;
-    const totalB = processDataset(datasetB.rows, datasetB.headers).totalIngresos;
-    const diffSales = totalB - totalA;
-    const diffSalesPct = totalA > 0 ? ((diffSales / totalA) * 100).toFixed(1) : '0';
-
-    if (diffSales > 0) {
-      insights.push(
-        `**Facturación Total:** Las ventas registradas subieron **+$${diffSales.toFixed(2)} USD** en B (+${diffSalesPct}% respecto a A).`
-      );
-    } else if (diffSales < 0) {
-      insights.push(
-        `**Facturación Total:** Las ventas cayeron **-$${Math.abs(diffSales).toFixed(2)} USD** en B (${diffSalesPct}% respecto a A).`
-      );
-    }
-  }
-
-  // 4. Insight Comercial: Categoría / Producto Líder en B
-  const prodColIndex = datasetB.headers.findIndex((h) => /product|linea|categoria/i.test(h));
-  if (prodColIndex !== -1 && salesColIndexB !== -1) {
-    const salesByCategory: Record<string, number> = {};
-    datasetB.rows.forEach((r) => {
-      const cat = r[prodColIndex];
-      const val = normalizeNumber(r[salesColIndexB]) || 0;
-      if (cat) salesByCategory[cat] = (salesByCategory[cat] || 0) + val;
-    });
-
-    const topCategory = Object.entries(salesByCategory).sort((a, b) => b[1] - a[1])[0];
-    if (topCategory) {
-      insights.push(
-        `**Categoría Líder (Dataset B):** **"${topCategory[0]}"** es la de mayor volumen comercial con **$${topCategory[1].toFixed(2)} USD**.`
-      );
-    }
-  }
-
-  // 5. Insight Comercial: Perfil Demográfico (Género)
-  const genderColIndex = datasetB.headers.findIndex((h) => /gender|genero/i.test(h));
-  if (genderColIndex !== -1) {
-    const females = datasetB.rows.filter((r) => /female|mujer/i.test(r[genderColIndex])).length;
-    const total = datasetB.rows.length;
-    if (total > 0) {
-      const femalePct = ((females / total) * 100).toFixed(1);
-      insights.push(`**Perfil del Cliente:** El **${femalePct}%** de los registros en el Dataset B corresponden a clientes mujeres.`);
-    }
-  }
-
-  // 6. Duplicados y Nulos
   if (metricsB.duplicates > metricsA.duplicates) {
     insights.push(
       `**Alerta de duplicados:** Se registraron **${metricsB.duplicates - metricsA.duplicates} filas duplicadas adicionales** en el Dataset B.`
     );
   }
 
-  // 7. Score General de Calidad
   if (qualityDelta !== 0) {
     const qualDirection = qualityDelta > 0 ? 'mejoró' : 'empeoró';
     insights.push(
